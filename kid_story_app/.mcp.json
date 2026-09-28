@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "flutterflow_ai": {
+      "type": "stdio",
+      "command": "C:\\dev\\flutter\\bin\\cache\\dart-sdk\\bin\\dart.exe",
+      "args": [
+        "C:\\Users\\fadi\\Documents\\StoryApp\\kid_story_app\\.flutterflow/sdk/flutterflow_ai\\mcp\\server.dill",
+        "--dir",
+        "C:\\Users\\fadi\\Documents\\StoryApp\\kid_story_app"
+      ],
+      "env": {}
+    }
+  }
+}
