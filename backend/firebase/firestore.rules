@@ -1,0 +1,219 @@
+rules_version = '2';
+
+// Kids Stories — repo-owned Firestore security rules.
+//
+// AUTHORITATIVE. The FlutterFlow export also contains a firebase/firestore.rules
+// file; that one is generated, fully permissive (`allow ...: if true` on every
+// collection) and must never be deployed. See backend/firebase/README.md.
+//
+// Design notes:
+// - Deny by default: there is no `match /{document=**}` allow rule.
+// - `favorites` and `progress` are TOP-LEVEL since ADR-01, so ownership is a
+//   field, not a path. Every rule on them checks ownerUid on read AND write,
+//   pins ownerUid on update, and cross-validates childRef/storyRef against the
+//   id fields so a client cannot point a row at someone else's child or story.
+// - Premium story pages are DENIED to ordinary clients. The entitlement mirror
+//   is not yet server-written, so there is nothing trustworthy to check.
+//   Locked is the correct behaviour; do not relax it to make a test pass.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------- helpers
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Admin is a Firebase Auth custom claim. No client is issued one; content
+    // and entitlement writes happen through the Admin SDK.
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    // The child document must exist under the calling user.
+    function childExistsForOwner(childId) {
+      return exists(
+        /databases/$(database)/documents/users/$(request.auth.uid)/children/$(childId)
+      );
+    }
+
+    function storyDoc(storyId) {
+      return get(/databases/$(database)/documents/stories/$(storyId)).data;
+    }
+
+    function storyIsPublished(storyId) {
+      return exists(/databases/$(database)/documents/stories/$(storyId))
+             && storyDoc(storyId).status == 'published';
+    }
+
+    function storyIsFree(storyId) {
+      return storyDoc(storyId).accessLevel == 'free';
+    }
+
+    // Shared ownership shape for the two flattened collections.
+    // `data` is request.resource.data on write, resource.data on read.
+    function ownsRow(data) {
+      return signedIn() && data.ownerUid == request.auth.uid;
+    }
+
+    // childRef / storyRef must agree with the id fields, and the child must
+    // actually belong to the caller.
+    function refsAreConsistent(data) {
+      return data.childRef == /databases/$(database)/documents/users/$(request.auth.uid)/children/$(data.childId)
+             && data.storyRef == /databases/$(database)/documents/stories/$(data.storyId)
+             && childExistsForOwner(data.childId);
+    }
+
+    // ownerUid may never be reassigned.
+    function ownerUidUnchanged() {
+      return request.resource.data.ownerUid == resource.data.ownerUid;
+    }
+
+    // ------------------------------------------------------------------ users
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid)
+                    && !request.resource.data.keys().hasAny(privilegedUserKeys());
+      allow update: if isAdmin()
+                    || (isOwner(uid)
+                        && !request.resource.data.diff(resource.data)
+                              .affectedKeys().hasAny(privilegedUserKeys()));
+      allow delete: if isAdmin();   // parent-initiated deletion is a server flow
+      allow write: if isAdmin();
+
+      // Fields a client must never set or alter. None exist in the schema
+      // today; listing them keeps a future addition from being client-writable.
+      function privilegedUserKeys() {
+        return ['premiumActive', 'entitlement', 'entitlementId', 'isPremium',
+                'subscription', 'accessExpiresAt', 'admin', 'role', 'claims'];
+      }
+
+      match /children/{childId} {
+        allow read, write: if isOwner(uid) || isAdmin();
+      }
+    }
+
+    // No collection-group access to children for ordinary users.
+    match /{path=**}/children/{childId} {
+      allow read, write: if isAdmin();
+    }
+
+    // -------------------------------------------------------------- favorites
+    match /favorites/{favoriteId} {
+      allow read: if isAdmin() || ownsRow(resource.data);
+
+      allow create: if isAdmin()
+                    || (ownsRow(request.resource.data)
+                        && refsAreConsistent(request.resource.data));
+
+      allow update: if isAdmin()
+                    || (ownsRow(resource.data)
+                        && ownsRow(request.resource.data)
+                        && ownerUidUnchanged()
+                        && refsAreConsistent(request.resource.data));
+
+      allow delete: if isAdmin() || ownsRow(resource.data);
+    }
+
+    // --------------------------------------------------------------- progress
+    match /progress/{progressId} {
+      // Value checks from FIREBASE_SCHEMA.md section 6.
+      function progressValuesValid(data) {
+        return data.lastPageNumber is int
+               && data.pageCount is int
+               && data.contentVersion is int
+               && data.readCompletedCount is int
+               && data.listenCompletedCount is int
+               && data.completed is bool
+               && data.lastPageNumber >= 1
+               && data.pageCount >= 1
+               && data.lastPageNumber <= data.pageCount
+               && data.readCompletedCount >= 0
+               && data.listenCompletedCount >= 0
+               && data.lastMode in ['read', 'listen'];
+      }
+
+      allow read: if isAdmin() || ownsRow(resource.data);
+
+      allow create: if isAdmin()
+                    || (ownsRow(request.resource.data)
+                        && refsAreConsistent(request.resource.data)
+                        && progressValuesValid(request.resource.data));
+
+      allow update: if isAdmin()
+                    || (ownsRow(resource.data)
+                        && ownsRow(request.resource.data)
+                        && ownerUidUnchanged()
+                        && refsAreConsistent(request.resource.data)
+                        && progressValuesValid(request.resource.data));
+
+      allow delete: if isAdmin() || ownsRow(resource.data);
+    }
+
+    // ---------------------------------------------------------------- stories
+    match /stories/{storyId} {
+      // Published metadata only — drafts and archives stay invisible. Premium
+      // METADATA is readable so the shelf can show a lock badge on a real cover.
+      allow read: if isAdmin()
+                  || (signedIn() && resource.data.status == 'published');
+      allow create, update, delete: if isAdmin();
+
+      match /pages/{pageId} {
+        // Free published pages only. Premium pages are denied until the
+        // server-written entitlement mirror exists; when it does, extend with:
+        //
+        //   || (storyIsPublished(storyId)
+        //       && exists(/databases/$(database)/documents/entitlements/$(request.auth.uid))
+        //       && get(/databases/$(database)/documents/entitlements/$(request.auth.uid)).data.premiumActive == true
+        //       && get(/databases/$(database)/documents/entitlements/$(request.auth.uid)).data.accessExpiresAt > request.time)
+        //
+        // Do NOT add that clause before the mirror is written by a Function.
+        allow read: if isAdmin()
+                    || (signedIn()
+                        && storyIsPublished(storyId)
+                        && storyIsFree(storyId));
+        allow create, update, delete: if isAdmin();
+      }
+    }
+
+    match /{path=**}/pages/{pageId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ------------------------------------------------------------- categories
+    match /categories/{categoryId} {
+      allow read: if isAdmin()
+                  || (signedIn() && resource.data.isActive == true);
+      allow create, update, delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------- appConfig
+    match /appConfig/{configId} {
+      // Only the `public` document is exposed; any other config doc is denied.
+      allow read: if isAdmin() || (signedIn() && configId == 'public');
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ----------------------------------------------------------- entitlements
+    match /entitlements/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update, delete: if false;   // Admin SDK only
+
+      match /events/{eventId} {
+        // FIREBASE_SECURITY_PLAN.md does not grant owners read access to the
+        // audit trail, so clients are denied entirely.
+        allow read: if isAdmin();
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /{path=**}/events/{eventId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+  }
+}
