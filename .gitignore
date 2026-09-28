@@ -1,0 +1,34 @@
+# Flutter / Dart
+.dart_tool/
+build/
+.packages
+pubspec.lock
+
+# FlutterFlow AI workspace — machine-local and regenerated
+kid_story_app/.flutterflow/sdk/
+kid_story_app/.flutterflow/.env
+kid_story_app/.flutterflow/traces/
+kid_story_app/.flutterflow/history/
+kid_story_app/.flutterflow/runs.jsonl
+kid_story_app/.ffai_staging/
+kids_stories/.flutterflow/sdk/
+kids_stories/.flutterflow/.env
+kids_stories/.flutterflow/traces/
+kids_stories/.flutterflow/history/
+kids_stories/.flutterflow/runs.jsonl
+kids_stories/.ffai_staging/
+
+# Generated FlutterFlow export — re-exported on demand, and it contains
+# Firebase native config files that should not be committed.
+generated_code/
+**/generated_code/
+
+# Node
+node_modules/
+
+# Secrets — never commit
+*.env
+.env*
+**/google-services.json
+**/GoogleService-Info.plist
+serviceAccount*.json
