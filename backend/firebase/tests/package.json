@@ -1,0 +1,16 @@
+{
+  "name": "kids-stories-firestore-rules-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Firebase Emulator security-rule tests for the Kids Stories Firestore schema. Nothing here deploys anything.",
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --config ../firebase.json \"mocha rules.test.js --timeout 20000\"",
+    "test:nostart": "mocha rules.test.js --timeout 20000"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.2.0",
+    "mocha": "^10.8.2"
+  }
+}
