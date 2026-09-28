@@ -1,0 +1,379 @@
+{
+  "meta": {
+    "name": "Kids Stories Design Tokens",
+    "version": "0.1.0",
+    "status": "draft-planning",
+    "updated": "2026-09-21",
+    "unit": "flutter-logical-pixels",
+    "source": "docs/DESIGN_SYSTEM.md",
+    "confirmedByOwner": ["colors.base", "typography.families", "layout.spacing", "touchTargets", "componentHeights.primaryButtonChild", "radii.card", "radii.pill", "rtl"]
+  },
+  "brand": {
+    "name": "Kids Stories",
+    "nameArabic": "",
+    "nameArabicStatus": "pending-owner-decision-D-29",
+    "audience": "children aged 1-6 and their parents",
+    "ageGroups": ["1-2", "3-4", "5-6"],
+    "visualDirection": "polished magical storybook: night skies, soft clouds, castles, stars, books, lanterns, gentle animals, cream surfaces, purple actions, gold highlights",
+    "artworkPolicy": "original or properly licensed only; reference images are mood only"
+  },
+  "colors": {
+    "base": {
+      "primary": "#7442C8",
+      "primaryLight": "#916BC1",
+      "storyBlueDark": "#122EA1",
+      "storyBlue": "#066CDE",
+      "backgroundCream": "#FFF8EA",
+      "surfaceSand": "#F0DCB2",
+      "parentBackground": "#F8ECE9",
+      "accentGold": "#F5B83D",
+      "accentPink": "#EE7692",
+      "textPrimary": "#40352F",
+      "textDarkBlue": "#0D1F45",
+      "error": "#E95763",
+      "white": "#FFFFFF"
+    },
+    "derived": {
+      "textSecondary": "#6B5E56",
+      "textOnPrimary": "#FFFFFF",
+      "textOnGold": "#0D1F45",
+      "textOnPink": "#0D1F45",
+      "errorText": "#C4404C",
+      "success": "#2F7A4B",
+      "outline": "#E3D3B6",
+      "outlineStrong": "#C9B48A",
+      "disabledSurface": "#EFE6D6",
+      "disabledText": "#8E8178",
+      "scrim": "rgba(13, 31, 69, 0.55)",
+      "shadowColor": "rgba(13, 31, 69, 0.18)",
+      "pressedOverlay": "rgba(13, 31, 69, 0.12)"
+    },
+    "semantic": {
+      "actionPrimary": "primary",
+      "actionPrimaryPressed": "primaryLight",
+      "actionSecondaryBorder": "primary",
+      "surfaceChild": "backgroundCream",
+      "surfaceChip": "surfaceSand",
+      "surfaceParentPage": "parentBackground",
+      "surfaceParentCard": "backgroundCream",
+      "textDefault": "textPrimary",
+      "textHeading": "textDarkBlue",
+      "textMuted": "textSecondary",
+      "textError": "errorText",
+      "iconError": "error",
+      "badgePremium": "accentGold",
+      "badgePremiumText": "textDarkBlue",
+      "favorite": "accentPink",
+      "listenAccent": "storyBlue",
+      "progress": "primary",
+      "progressTrack": "surfaceSand",
+      "completed": "success",
+      "overlayScrim": "scrim"
+    },
+    "gradients": {
+      "nightSky": {
+        "direction": "top-to-bottom",
+        "stops": ["#0D1F45", "#122EA1", "#066CDE"],
+        "usage": "decorative backgrounds only, never behind body text"
+      },
+      "celebration": {
+        "direction": "start-to-end",
+        "stops": ["#F5B83D", "#EE7692"],
+        "usage": "story-complete accents only"
+      }
+    },
+    "flutterflowThemeSlots": {
+      "primary": "primary",
+      "secondary": "storyBlue",
+      "tertiary": "accentGold",
+      "alternate": "surfaceSand",
+      "primaryText": "textPrimary",
+      "secondaryText": "textSecondary",
+      "primaryBackground": "backgroundCream",
+      "secondaryBackground": "parentBackground",
+      "accent1": "primaryLight",
+      "accent2": "accentPink",
+      "accent3": "storyBlueDark",
+      "accent4": "textDarkBlue",
+      "success": "success",
+      "error": "error",
+      "warning": "accentGold",
+      "info": "storyBlue"
+    },
+    "contrastMinimums": {
+      "bodyText": 4.5,
+      "largeText": 3.0,
+      "nonTextUi": 3.0,
+      "largeTextThresholdBoldPx": 18.66,
+      "largeTextThresholdRegularPx": 24
+    },
+    "darkMode": "not-supported-in-mvp"
+  },
+  "typography": {
+    "families": {
+      "display": {
+        "name": "Baloo Bhaijaan 2",
+        "weights": [600, 700, 800],
+        "arabicSupport": true,
+        "diacriticsSupport": "verify-on-device",
+        "licence": "verify-OFL-and-bundle"
+      },
+      "body": {
+        "name": "Tajawal",
+        "weights": [400, 500, 700, 800],
+        "arabicSupport": true,
+        "diacriticsSupport": "verify-on-device-before-lock",
+        "fallbackForStoryBodyIfDiacriticsFail": "Noto Naskh Arabic",
+        "licence": "verify-OFL-and-bundle"
+      },
+      "rule": "never configure a font without full Arabic coverage anywhere in the theme"
+    },
+    "roles": {
+      "displayLarge": { "family": "display", "weight": 800, "size": 34, "lineHeight": 1.3, "flutterflowSlot": "displayLarge" },
+      "displayMedium": { "family": "display", "weight": 700, "size": 30, "lineHeight": 1.3, "flutterflowSlot": "displayMedium" },
+      "displaySmall": { "family": "display", "weight": 700, "size": 28, "lineHeight": 1.3, "flutterflowSlot": "displaySmall" },
+      "headlineMedium": { "family": "display", "weight": 600, "size": 24, "lineHeight": 1.35, "flutterflowSlot": "headlineMedium" },
+      "headlineSmall": { "family": "display", "weight": 600, "size": 22, "lineHeight": 1.35, "flutterflowSlot": "headlineSmall" },
+      "titleLarge": { "family": "body", "weight": 700, "size": 22, "lineHeight": 1.4, "flutterflowSlot": "titleLarge" },
+      "titleMedium": { "family": "body", "weight": 700, "size": 20, "lineHeight": 1.4, "flutterflowSlot": "titleMedium" },
+      "titleSmall": { "family": "body", "weight": 700, "size": 18, "lineHeight": 1.4, "flutterflowSlot": "titleSmall" },
+      "storyBody": { "family": "body", "weight": 500, "size": 26, "lineHeight": 1.9, "flutterflowSlot": "bodyLarge-overridden" },
+      "bodyLarge": { "family": "body", "weight": 400, "size": 18, "lineHeight": 1.6, "flutterflowSlot": "bodyLarge" },
+      "bodyMedium": { "family": "body", "weight": 400, "size": 16, "lineHeight": 1.6, "flutterflowSlot": "bodyMedium" },
+      "bodySmall": { "family": "body", "weight": 400, "size": 14, "lineHeight": 1.5, "flutterflowSlot": "bodySmall", "childModeAllowed": false },
+      "labelLarge": { "family": "body", "weight": 700, "size": 16, "lineHeight": 1.4, "flutterflowSlot": "labelLarge" },
+      "labelMedium": { "family": "body", "weight": 500, "size": 14, "lineHeight": 1.4, "flutterflowSlot": "labelMedium", "childModeAllowed": false }
+    },
+    "storyBodyByAgeGroup": {
+      "1-2": 30,
+      "3-4": 28,
+      "5-6": 26,
+      "minimum": 22
+    },
+    "rules": {
+      "storyTextMinimumPx": 22,
+      "primaryButtonTextPx": [20, 22],
+      "pageTitlePx": [28, 34],
+      "childModeMinimumTextPx": 16,
+      "parentModeMinimumTextPx": 14,
+      "lineHeightWithDiacriticsMin": 1.8,
+      "letterSpacing": 0,
+      "textAlign": "start",
+      "justify": false,
+      "fauxBold": false,
+      "textScaleClampChildMode": 1.3
+    }
+  },
+  "fontSizes": {
+    "xs": 14,
+    "sm": 16,
+    "md": 18,
+    "lg": 20,
+    "xl": 22,
+    "2xl": 24,
+    "3xl": 26,
+    "4xl": 28,
+    "5xl": 30,
+    "6xl": 34
+  },
+  "fontWeights": {
+    "regular": 400,
+    "medium": 500,
+    "semibold": 600,
+    "bold": 700,
+    "extrabold": 800,
+    "note": "Tajawal has no 600 weight; use 700"
+  },
+  "layout": {
+    "spacing": {
+      "base": 8,
+      "scale": {
+        "1": 4,
+        "2": 8,
+        "3": 12,
+        "4": 16,
+        "5": 24,
+        "6": 32,
+        "7": 40,
+        "8": 48,
+        "9": 64
+      },
+      "pageGutterPhone": 16,
+      "pageGutterTablet": 24,
+      "cardPaddingChild": 24,
+      "cardPaddingParent": 20,
+      "childControlGapMin": 16,
+      "shelfSectionGap": 32
+    },
+    "breakpoints": {
+      "compact": { "minWidth": 0, "maxWidth": 599 },
+      "medium": { "minWidth": 600, "maxWidth": 839 },
+      "expanded": { "minWidth": 840, "maxWidth": null },
+      "note": "verify against FlutterFlow editor breakpoints and adopt FlutterFlow's values if they differ"
+    },
+    "grid": {
+      "storyColumns": { "compact": 2, "medium": 3, "expanded": 4 },
+      "avatarColumns": { "compact": 4, "medium": 6, "expanded": 6 },
+      "profileTileColumns": { "compact": 2, "medium": 3, "expanded": 4 }
+    },
+    "maxWidths": {
+      "formCompact": null,
+      "formMedium": 560,
+      "formExpanded": 640,
+      "readerMedium": 720,
+      "readerExpanded": 900,
+      "parentContent": 640,
+      "subscriptionContent": 560,
+      "dialogCard": 480
+    },
+    "orientation": {
+      "phone": "portrait",
+      "tablet": "portrait",
+      "tabletLandscape": "pending-decision-D-08"
+    }
+  },
+  "radii": {
+    "xs": 8,
+    "sm": 12,
+    "md": 16,
+    "card": 24,
+    "cardRange": [20, 28],
+    "lg": 28,
+    "pill": 999,
+    "circle": "50%"
+  },
+  "shadows": {
+    "soft1": { "offsetX": 0, "offsetY": 2, "blur": 8, "spread": 0, "color": "rgba(13, 31, 69, 0.18)" },
+    "soft2": { "offsetX": 0, "offsetY": 6, "blur": 20, "spread": 0, "color": "rgba(13, 31, 69, 0.18)" },
+    "soft3": { "offsetX": 0, "offsetY": 12, "blur": 32, "spread": -4, "color": "rgba(13, 31, 69, 0.18)" }
+  },
+  "borders": {
+    "cardOutline": 1,
+    "textField": 1.5,
+    "secondaryButton": 2,
+    "selectedPlanCard": 3,
+    "selectedAvatarRing": 4,
+    "listenHighlight": 3
+  },
+  "touchTargets": {
+    "childMin": 56,
+    "adultMin": 48,
+    "childPrimaryButtonHeight": 64,
+    "childPrimaryButtonMinHeight": 60,
+    "childIconButton": 64,
+    "adultIconButton": 48,
+    "heroIconButton": 72,
+    "minGapBetweenChildTargets": 16
+  },
+  "componentHeights": {
+    "primaryButtonChild": 64,
+    "primaryButtonAdult": 56,
+    "secondaryButtonChild": 56,
+    "secondaryButtonAdult": 48,
+    "textField": 56,
+    "chip": 44,
+    "chipTouchTarget": 56,
+    "segmentedSelectorChild": 56,
+    "segmentedSelectorAdult": 48,
+    "ageGroupOption": 64,
+    "avatarOptionCell": 88,
+    "avatarCircle": 72,
+    "profileTile": 160,
+    "profileTileWidth": 140,
+    "storyCardShelfWidthPhone": 160,
+    "storyCardShelfWidthTablet": 200,
+    "storyCardTitleBlock": 56,
+    "categoryCardPhone": { "width": 140, "height": 110 },
+    "categoryCardTablet": { "width": 168, "height": 128 },
+    "storyTextCardMinHeight": 120,
+    "storyTextCardMaxHeightFraction": 0.4,
+    "planCardMinHeight": 140,
+    "appBar": 64,
+    "readerTopBar": 64,
+    "readerControlBar": 96,
+    "lockOverlayIllustration": 160,
+    "emptyStateIllustrationChild": 160,
+    "emptyStateIllustrationAdult": 120
+  },
+  "iconSizes": {
+    "parentInline": 24,
+    "childInline": 32,
+    "circularChild": 32,
+    "circularAdult": 24,
+    "hero": 36,
+    "category": 40,
+    "state": 48
+  },
+  "opacity": {
+    "disabled": 0.38,
+    "pressed": 0.12,
+    "translucentSurfaceMin": 0.92,
+    "decorativeMotifParent": 0.05
+  },
+  "rtl": {
+    "textDirection": "rtl",
+    "locale": "ar",
+    "leadingSide": "right",
+    "trailingSide": "left",
+    "nextPageControlSide": "left",
+    "previousPageControlSide": "right",
+    "advanceSwipeDirection": "left-to-right",
+    "forwardPageTransitionEntersFrom": "left",
+    "mirrorDirectionalIcons": true,
+    "mirrorMediaIcons": false,
+    "numeralsChildMode": "arabic-indic",
+    "numeralsParentMode": "arabic-indic",
+    "numeralsDecisionStatus": "D-05-open-default-recorded",
+    "storePriceStrings": "as-returned-by-store",
+    "bidiIsolateMixedContent": true,
+    "textAlign": "start",
+    "arrowLabelsRequired": true
+  },
+  "animation": {
+    "durationsMs": {
+      "fast": 120,
+      "normal": 200,
+      "slow": 320,
+      "pageTurn": 350,
+      "celebration": 900,
+      "autoAdvanceDelay": 1500,
+      "skeletonShimmer": 1200,
+      "splashMinimum": 400
+    },
+    "easing": {
+      "enter": "ease-out",
+      "exit": "ease-in",
+      "pageTurn": "ease-in-out"
+    },
+    "reduceMotion": {
+      "respectSystemSetting": true,
+      "pageTurnBecomes": "cross-fade",
+      "disableShimmer": true,
+      "disableDecorativeDrift": true,
+      "maxFlashesPerSecond": 1
+    },
+    "pressFeedbackScale": 0.97
+  },
+  "modes": {
+    "child": {
+      "background": "illustrated",
+      "surface": "backgroundCream",
+      "primaryActionsVisibleAtOnce": 1,
+      "minTouchTarget": 56,
+      "minTextPx": 16,
+      "pricesVisible": false,
+      "externalLinks": false
+    },
+    "parent": {
+      "background": "parentBackground",
+      "surface": "backgroundCream",
+      "decorativeDensity": "low",
+      "minTouchTarget": 48,
+      "minTextPx": 14,
+      "countdowns": false,
+      "fakeDiscounts": false,
+      "bestValueBadgeOnlyOnRealDiscount": true,
+      "backButtonAlwaysVisible": true
+    }
+  }
+}
