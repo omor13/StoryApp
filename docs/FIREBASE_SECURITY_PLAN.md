@@ -5,6 +5,8 @@
 | Status | Draft v0.1 — **prepared, not deployed.** Written 2026-09-27 alongside the Firestore schema work in FlutterFlow project `kid-story-app-vel697`. |
 | Scope | Firestore rules and composite indexes only. Storage rules, Cloud Functions, and the RevenueCat webhook are explicitly out of scope. |
 | Source of truth | [FIREBASE_SCHEMA.md](FIREBASE_SCHEMA.md) — §12 ownership, §13 queries, §14 indexes. [SECURITY_AND_PRIVACY.md](SECURITY_AND_PRIVACY.md). [MONETIZATION_AND_TTS.md](MONETIZATION_AND_TTS.md) §5 entitlement model. |
+| Firebase project | `kid-story-app-vel697`. Android `google-services.json` and iOS `GoogleService-Info.plist` both point at it; package and bundle identifier both `com.mycompany.kidstoryapp`. |
+| Firestore database | `(default)`, FIRESTORE_NATIVE, STANDARD edition, **location `eur3`** (Europe multi-region), created 2026-09-25. Retrieved read-only via `firebase firestore:databases:get`. The location is permanent. |
 | Contains no secrets | No credentials, API keys, or Firebase config-file contents appear in this document, by policy. |
 
 ---
@@ -168,15 +170,37 @@ Every index names the query it serves — none is speculative.
 | I-11 | `favorites` | ownerUid, childId, createdAt DESC | Q9 favourites shelf |
 | I-8 | `favorites` | ownerUid, childId, storyId | Q10 is-favourite + upsert probe (§5.1) |
 | I-6 | `categories` | isActive, sortOrder | Q13 active categories |
-| I-12 | `events` | eventAt DESC | Admin/audit read of entitlement events (server-side only) |
 
 **Changed by ADR-01.** I-5 was `completed, updatedAt DESC` on the nested
 `progress` subcollection, where the path scoped the query to one child.
 Flattening removed that scoping, so every `favorites` / `progress` index now
-leads with `ownerUid, childId`. I-8 to I-12 are new: I-8/I-9 back the
-query-before-create upserts that replace the old deterministic document IDs,
-I-10 and I-11 replace what used to be automatic single-field indexes on the
-nested collections, and I-12 backs the audit read.
+leads with `ownerUid, childId`. I-8 to I-11 are new: I-8/I-9 back the
+lookup queries Q10/Q11 (they do NOT enforce uniqueness — the deterministic
+document ID does), and I-10/I-11 replace what used to be automatic single-field indexes on the
+nested collections. I-8 and I-9 are **lookup indexes only** — uniqueness comes
+from the deterministic document ID, not from a query.
+
+**I-12 was removed (2026-09-29).** It proposed a composite index on `events`
+with the single field `eventAt DESC`. Firestore composite indexes require at
+least two fields, so that definition is invalid and would be rejected on
+deploy. The intended query is **parent-scoped** — `entitlements/{uid}/events`
+ordered by `eventAt desc` for one parent, read by admin tooling through the
+Admin SDK — and a parent-scoped single-field sort is served by Firestore's
+**automatic single-field index**. No custom index is needed. A collection-group
+index across all parents' events is deliberately **not** created (§13), so the
+audit trail can never be queried across accounts.
+
+
+**I-12 was removed (2026-09-29).** It proposed a composite index on `events`
+with the single field `eventAt DESC`. Firestore composite indexes require at
+least two fields, so that definition is invalid and would be rejected on
+deploy. The intended query is **parent-scoped** —
+`entitlements/{uid}/events` ordered by `eventAt desc` for one parent, read by
+admin tooling through the Admin SDK — and a parent-scoped single-field sort is
+served by Firestore's **automatic single-field index**. No custom index is
+needed. A collection-group index across all parents' events is deliberately
+**not** created (§13), so the audit trail can never be queried across accounts.
+
 
 Still served by automatic single-field indexes — **do not create composites**:
 Q1 children by `createdAt`, Q12 pages by `pageNumber`.
@@ -208,11 +232,21 @@ do work the path used to do for free. For both collections every rule checks:
 `progress` additionally validates value ranges (`1 <= lastPageNumber <= pageCount`,
 non-negative counters, `lastMode in ['read','listen']`).
 
-**What rules cannot do:** enforce uniqueness across documents. The old design
-got one-row-per-story for free from the document ID; auto-IDs do not, and the
-FlutterFlow DSL cannot supply a deterministic ID. Uniqueness is a client
-query-before-create invariant (FIREBASE_SCHEMA.md §5.1 / §6.1) and duplicates
-must be tolerated by readers. This is a deliberate, documented trade-off.
+**Document identity is deterministic.** Both collections use
+`{ownerUid}_{childId}_{storyId}` as the document ID, and the rules enforce it:
+a create is rejected unless the wildcard ID equals
+`request.auth.uid + "_" + childId + "_" + storyId`, and an update must keep the
+ID matching its identity fields. That restores the one-row-per-tuple guarantee
+the nested path used to provide, without a Cloud Function or custom Dart.
+
+The ID is configured with the **Custom ID** toggle on the Create Document action
+in the FlutterFlow Action Flow Editor. That is a FlutterFlow editor capability;
+it simply cannot be authored through the current AI SDK, whose `FirestoreCreate`
+exposes no document-ID parameter. **Until the UI actions are wired with Custom
+ID, the app must not create favorites or progress documents** — an auto-ID write
+would now be rejected by the rules, which is the intended safety behaviour.
+
+Query-before-create is a lookup convenience, not the uniqueness mechanism.
 
 Cross-parent isolation also no longer comes from the path — it comes from rule 1
 plus indexes that lead with `ownerUid`, so a query without an `ownerUid`

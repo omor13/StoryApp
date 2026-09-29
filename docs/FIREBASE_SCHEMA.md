@@ -70,7 +70,7 @@ Consequences, each addressed below:
 | Ownership (`users/{uid}/…`) | `ownerUid == request.auth.uid` in rules (§12), on read *and* write |
 | Child scoping | `childId` + `childRef`, cross-checked against `users/{uid}/children/{childId}` in rules |
 | Story identity as the document ID | `storyId` + `storyRef` fields; the document ID is now opaque |
-| Uniqueness (one doc per story, free) | **No longer automatic** — see §5.1 |
+| Uniqueness (one doc per story, free) | Restored by a **deterministic document ID** `{ownerUid}_{childId}_{storyId}`, enforced in rules — see §5.1 |
 | No cross-parent queries | Rules require `ownerUid` equality; queries must filter on it |
 
 ---
@@ -152,8 +152,9 @@ Consequences, each addressed below:
 | `storyRef` | reference | yes | `stories/{storyId}`. Rules verify it matches `storyId`. |
 | `createdAt` | timestamp | yes | Server timestamp; orders the favourites shelf. |
 
-**Document ID:** Firestore auto-ID. It is **opaque and carries no meaning** — the
-story is identified by `storyId` / `storyRef`, not by the key.
+**Document ID:** deterministic —
+`favorites/{ownerUid}_{childId}_{storyId}`. See §5.1 for how and when this is
+configured.
 
 Favouriting a premium story is still allowed without a subscription; it stays
 locked in the shelf.
@@ -170,33 +171,37 @@ locked in the shelf.
 }
 ```
 
-### 5.1 Uniqueness is now the client's job **[REQUIRED READING]**
+### 5.1 Document identity — deterministic IDs
 
-The old design used the story ID as the document ID, so a favourite was a
-`set`/`delete` and duplicates were structurally impossible. With auto-IDs that
-guarantee is gone, and **the FlutterFlow DSL cannot supply a deterministic
-document ID**: `FirestoreCreate(collection, {fields, parentReference, outputAs})`
-has no `documentId` parameter, and `FirestoreUpdate` needs a reference that
-already exists — `DocumentReferenceOf` only extracts a reference from a loaded
-document, it cannot build one from a path string.
+The document ID is **`{ownerUid}_{childId}_{storyId}`**. That makes identity
+structural again: one document per owner, child and story, and repeating the
+operation for the same tuple addresses the **same document** instead of creating
+another one. Favouriting becomes a set; un-favouriting a delete.
 
-The intended identity is still **one document per (ownerUid, childId, storyId)
-tuple**. Because it cannot be enforced by the key, every write must follow
-**query-before-create (upsert)**:
+**Tooling status — read this before wiring any write:**
 
-1. Query `favorites` where `ownerUid ==` current uid **and** `childId ==` active child **and** `storyId ==` the story. (Index I-8.)
-2. If a document is returned → un-favourite is a `delete`; re-favourite is a no-op.
-3. Only if the query is empty → `FirestoreCreate`.
+| Capability | Status |
+|---|---|
+| Creating the collection + fields | ✅ Supported by the FlutterFlow AI SDK/DSL — already done. |
+| Configuring a Create Document action with a **Custom ID** | ✅ Supported by the **FlutterFlow visual editor** — the Create Document action has a Custom ID toggle ([Firestore Actions docs](https://docs.flutterflow.io/integrations/database/cloud-firestore/firestore-actions/)). |
+| Authoring that Custom ID **through the AI SDK/DSL** | ❌ Not available in the current SDK surface: `FirestoreCreate(collection, {fields, parentReference, outputAs})` exposes no document-ID parameter. |
 
-Firestore security rules **cannot** enforce cross-document uniqueness, so this
-is a client-side invariant, not a guarantee. Treat duplicates as possible:
-readers should de-duplicate by `storyId` and tolerate more than one row.
+So this is a **limitation of the AI SDK's action surface, not of FlutterFlow.**
+The Custom ID will be set in the Action Flow Editor when the UI actions are
+wired, using the expression `{ownerUid}_{childId}_{storyId}`.
 
-If exact-once semantics become important, the supported options are a Cloud
-Function performing a transactional upsert, or a custom Dart action calling the
-Firestore SDK with an explicit document ID — both out of scope here.
+**Until that UI wiring exists, the app must not create any favorites document.**
+There is no supported path today that would give it the right ID, and a write
+with an auto-ID would break the uniqueness guarantee the rules now enforce.
 
----
+Query-before-create is **not** the uniqueness mechanism — deterministic IDs are.
+A lookup query may still be used to read an existing favourite (Q10), but it is
+a lookup, not a guard. Neither a Cloud Function nor a custom Dart action is
+required for this.
+
+The rules enforce the convention: a create is rejected unless the document ID
+equals `request.auth.uid + "_" + childId + "_" + storyId`, so a mismatched or
+auto-generated ID cannot land.
 
 ## 6. `progress/{progressId}` — reading and listening progress, top-level (see ADR-01)
 
@@ -223,10 +228,13 @@ Firestore SDK with an explicit document ID — both out of scope here.
 | `readCompletedCount` | int | yes | Times finished in read mode; starts at 0. |
 | `listenCompletedCount` | int | yes | Times finished in listen mode; starts at 0. |
 | `completedAt` | timestamp | no | Set when `completed` first becomes true. |
-| `updatedAt` | timestamp | yes | Used for "continue reading" ordering. |
+| `updatedAt` | timestamp | yes | Used for "continue reading" ordering (Q7 / index I-5). |
+| `completionPercent` | double | no | 0.0–100.0; progress ring without loading the story. Added 2026-09-29. |
+| `startedAt` | timestamp | no | First open of this story by this child; never overwritten. Added 2026-09-29. |
 
-**Document ID:** Firestore auto-ID, opaque. The story is identified by
-`storyId` / `storyRef`.
+**Document ID:** deterministic —
+`progress/{ownerUid}_{childId}_{storyId}`, same convention and tooling status as
+§5.1.
 
 **Example** (document `progress/Kd8sPq…`)
 ```json
@@ -248,21 +256,27 @@ Firestore SDK with an explicit document ID — both out of scope here.
 }
 ```
 
-### 6.1 Uniqueness
+### 6.1 Document identity
 
-Identical to §5.1 and for the same reason: the intended identity is one
-document per **(ownerUid, childId, storyId)** tuple, auto-IDs cannot express it,
-and the DSL cannot supply a deterministic ID. Every progress write is a
-**query-before-create/update**:
+Identical to §5.1: the ID is **`{ownerUid}_{childId}_{storyId}`**, so one
+document per owner, child and story, and a repeated write updates that same
+document rather than adding another. The Custom ID is configured in the
+FlutterFlow Action Flow Editor when the reader's progress-saving action is
+wired — it cannot be authored through the current AI SDK.
 
-1. Query `progress` where `ownerUid ==` uid **and** `childId ==` child **and** `storyId ==` story. (Index I-9.)
-2. Document found → `FirestoreUpdate` against its reference.
-3. Empty → `FirestoreCreate`.
+**No progress document should be written from the app until that wiring
+exists.** Rules reject any create whose document ID does not match the tuple.
 
-Rules cannot enforce this; readers must tolerate duplicates and prefer the row
-with the newest `updatedAt`.
+Two new fields were added 2026-09-29:
 
----
+| Field | Type | Notes |
+|---|---|---|
+| `completionPercent` | double | 0.0–100.0. Lets a shelf draw a progress ring without loading the story to learn `pageCount`. |
+| `startedAt` | timestamp | First time this child opened this story; never overwritten. Distinct from `updatedAt`, which moves on every write. |
+
+Deliberately **not** added, to avoid two sources of truth for one concept:
+`currentPage` (use `lastPageNumber`), `readingMode` (use `lastMode`),
+`lastReadAt` (use `updatedAt` — also the ordering key for Q7 and index I-5).
 
 ## 7. `stories/{storyId}` — catalog entry
 
@@ -584,15 +598,25 @@ Read-cost notes: the catalog is small (tens of stories); Q2–Q5, Q14 are served
 | I-9 | `progress` | `ownerUid ASC`, `childId ASC`, `storyId ASC` | Collection |
 | I-10 | `progress` | `ownerUid ASC`, `childId ASC`, `completed ASC` | Collection |
 | I-11 | `favorites` | `ownerUid ASC`, `childId ASC`, `createdAt DESC` | Collection |
-| I-12 | `events` | `eventAt DESC` | Collection |
 
 **Changed by ADR-01.** I-5 was `completed ASC, updatedAt DESC` on the nested
 `progress` subcollection, where the path already scoped the query to one child.
 Flattening removes that scoping, so every `favorites` / `progress` index must
 now lead with `ownerUid, childId`. I-8 to I-11 are new and exist only because
-of the flattening; each one names the query it serves in §13. I-12 backs the
-admin/audit read of `entitlements/{uid}/events` ordered by event time, and is
-server-side only — no client may read that collection.
+of the flattening; each one names the query it serves in §13. **I-8 and I-9 are
+lookup indexes only** — they back the Q10/Q11 reads. They do NOT enforce
+uniqueness; the deterministic document ID does (§5.1 / §6.1).
+
+**I-12 was removed (2026-09-29).** It proposed a composite index on `events`
+with the single field `eventAt DESC`. Firestore composite indexes require at
+least two fields, so that definition is invalid and would be rejected on
+deploy. The intended query is **parent-scoped** — `entitlements/{uid}/events`
+ordered by `eventAt desc` for one parent, read by admin tooling through the
+Admin SDK — and a parent-scoped single-field sort is served by Firestore's
+**automatic single-field index**. No custom index is needed. A collection-group
+index across all parents' events is deliberately **not** created (§13), so the
+audit trail can never be queried across accounts.
+
 
 Illustrative `firestore.indexes.json` entry for I-2 (to be created in `backend/` during Phase 2, not now):
 ```json
