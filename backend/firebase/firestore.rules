@@ -68,9 +68,19 @@ service cloud.firestore {
              && childExistsForOwner(data.childId);
     }
 
-    // ownerUid may never be reassigned.
-    function ownerUidUnchanged() {
-      return request.resource.data.ownerUid == resource.data.ownerUid;
+    // The identity fields may never be reassigned — otherwise a row
+    // could be retargeted at a different child or story while keeping its ID.
+    function identityUnchanged() {
+      return request.resource.data.ownerUid == resource.data.ownerUid
+             && request.resource.data.childId == resource.data.childId
+             && request.resource.data.storyId == resource.data.storyId;
+    }
+
+    // Deterministic document ID: {ownerUid}_{childId}_{storyId}.
+    // Checked against request.auth.uid rather than the ownerUid field so a
+    // forged ownerUid cannot be used to construct a matching ID.
+    function idMatchesTuple(docId, data) {
+      return docId == request.auth.uid + '_' + data.childId + '_' + data.storyId;
     }
 
     // ------------------------------------------------------------------ users
@@ -106,14 +116,18 @@ service cloud.firestore {
     match /favorites/{favoriteId} {
       allow read: if isAdmin() || ownsRow(resource.data);
 
+      // Document ID must be {uid}_{childId}_{storyId} — this is what makes
+      // one-row-per-tuple structural rather than a client convention.
       allow create: if isAdmin()
                     || (ownsRow(request.resource.data)
+                        && idMatchesTuple(favoriteId, request.resource.data)
                         && refsAreConsistent(request.resource.data));
 
       allow update: if isAdmin()
                     || (ownsRow(resource.data)
                         && ownsRow(request.resource.data)
-                        && ownerUidUnchanged()
+                        && identityUnchanged()
+                        && idMatchesTuple(favoriteId, request.resource.data)
                         && refsAreConsistent(request.resource.data));
 
       allow delete: if isAdmin() || ownsRow(resource.data);
@@ -141,13 +155,16 @@ service cloud.firestore {
 
       allow create: if isAdmin()
                     || (ownsRow(request.resource.data)
+                        && idMatchesTuple(progressId, request.resource.data)
                         && refsAreConsistent(request.resource.data)
                         && progressValuesValid(request.resource.data));
 
+      // Identity fields are pinned; the ordinary progress fields may change.
       allow update: if isAdmin()
                     || (ownsRow(resource.data)
                         && ownsRow(request.resource.data)
-                        && ownerUidUnchanged()
+                        && identityUnchanged()
+                        && idMatchesTuple(progressId, request.resource.data)
                         && refsAreConsistent(request.resource.data)
                         && progressValuesValid(request.resource.data));
 
