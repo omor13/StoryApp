@@ -5,7 +5,7 @@
   "description": "Firebase Emulator security-rule tests for the Kids Stories Firestore schema. Nothing here deploys anything.",
   "type": "module",
   "scripts": {
-    "test": "firebase emulators:exec --only firestore --config ../firebase.json \"mocha rules.test.js --timeout 20000\"",
+    "test": "firebase emulators:exec --only firestore --project demo-kids-stories-rules --config ../firebase.json \"mocha rules.test.js --timeout 20000\"",
     "test:nostart": "mocha rules.test.js --timeout 20000"
   },
   "devDependencies": {

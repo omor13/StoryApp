@@ -32,3 +32,8 @@ node_modules/
 **/google-services.json
 **/GoogleService-Info.plist
 serviceAccount*.json
+
+# Firebase emulator scratch output
+firestore-debug.log
+firebase-debug.log
+ui-debug.log

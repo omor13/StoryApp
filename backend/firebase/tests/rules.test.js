@@ -36,7 +36,10 @@ import {
 } from 'firebase/firestore';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ID = 'kids-stories-rules-test';
+// Demo project: the emulator treats a `demo-` prefix as offline-only, so it
+// never reaches a real Firebase project and needs no login. Must match the
+// --project passed to `firebase emulators:exec` in package.json.
+const PROJECT_ID = 'demo-kids-stories-rules';
 
 const ALICE = 'alice_uid';
 const BOB = 'bob_uid';
@@ -47,6 +50,8 @@ const BOB_CHILD = 'child_b1';
 const FREE_STORY = 'laila-and-the-star';
 const PREMIUM_STORY = 'al-ghayma-al-saghira';
 const DRAFT_STORY = 'not-published-yet';
+/** Carries no seeded progress row, so a create can be exercised as a create. */
+const UNTOUCHED_STORY = 'arnab-wa-al-qamar';
 
 let testEnv;
 
@@ -88,7 +93,10 @@ function progressRow(db, uid, childId, storyId, overrides = {}) {
     completionPercent: 25.0, // 100 * 3 / 12
     readCompletedCount: 0,
     listenCompletedCount: 0,
-    startedAt: new Date(),
+    // Fixed, not `new Date()`: startedAt is write-once (firestore.rules
+    // startedAtPreserved), so a fresh value per call would make every repeat
+    // write to the same row an illegal update. Matches the seeded row.
+    startedAt: SEEDED_STARTED_AT,
     updatedAt: new Date(),
     ...overrides,
   };
@@ -141,6 +149,13 @@ before(async () => {
       pageNumber: 1,
       displayTextAr: 'غيمةٌ صغيرة…',
       ttsTextAr: 'غيمةٌ صغيرة…',
+    });
+
+    await setDoc(doc(db, `stories/${UNTOUCHED_STORY}`), {
+      titleAr: 'الأرنب والقمر',
+      status: 'published',
+      accessLevel: 'free',
+      sortOrder: 25,
     });
 
     await setDoc(doc(db, `stories/${DRAFT_STORY}`), {
@@ -639,13 +654,17 @@ describe('progress value validation', () => {
     await assertSucceeds(setDoc(pid(), row({ lastPlaybackSpeed: 1.25 })));
   });
 
+  // A create, not an update: omitting startedAt is only legal on a row that
+  // does not exist yet, so this uses the one story with no progress row.
   it('accepts a row omitting every optional field', async () => {
     const db = aliceDb();
-    const minimal = progressRow(db, ALICE, ALICE_CHILD, STORY);
+    const minimal = progressRow(db, ALICE, ALICE_CHILD, UNTOUCHED_STORY);
     delete minimal.completionPercent;
     delete minimal.startedAt;
     delete minimal.lastPlaybackSpeed;
-    await assertSucceeds(setDoc(doc(db, progId(ALICE, ALICE_CHILD, STORY)), minimal));
+    await assertSucceeds(
+      setDoc(doc(db, progId(ALICE, ALICE_CHILD, UNTOUCHED_STORY)), minimal),
+    );
   });
 
   // --- negative and out-of-range values that must be rejected ---
