@@ -50,6 +50,9 @@ const DRAFT_STORY = 'not-published-yet';
 
 let testEnv;
 
+/** Fixed so startedAt-immutability tests have a known prior value. */
+const SEEDED_STARTED_AT = new Date('2026-09-01T10:00:00Z');
+
 /** Deterministic document IDs: {ownerUid}_{childId}_{storyId}. */
 const favId = (uid, childId, storyId) => `favorites/${uid}_${childId}_${storyId}`;
 const progId = (uid, childId, storyId) => `progress/${uid}_${childId}_${storyId}`;
@@ -82,8 +85,10 @@ function progressRow(db, uid, childId, storyId, overrides = {}) {
     lastMode: 'read',
     lastPlaybackSpeed: 1.0,
     completed: false,
+    completionPercent: 25.0, // 100 * 3 / 12
     readCompletedCount: 0,
     listenCompletedCount: 0,
+    startedAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
   };
@@ -180,8 +185,10 @@ before(async () => {
       contentVersion: 1,
       lastMode: 'read',
       completed: false,
+      completionPercent: 16.7,
       readCompletedCount: 0,
       listenCompletedCount: 0,
+      startedAt: SEEDED_STARTED_AT,
       updatedAt: new Date(),
     });
   });
@@ -533,9 +540,10 @@ describe('deterministic document IDs', () => {
         doc(db, PROG_ID),
         progressRow(db, ALICE, ALICE_CHILD, FREE_STORY, {
           lastPageNumber: 7,
-          completed: true,
+          completed: false,
           completionPercent: 58.3,
           readCompletedCount: 1,
+          startedAt: SEEDED_STARTED_AT,
         }),
       ),
     );
@@ -583,6 +591,165 @@ describe('collection queries', () => {
     const db = aliceDb();
     await assertSucceeds(
       getDocs(query(collection(db, 'progress'), where('ownerUid', '==', ALICE))),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Progress value validation — FIREBASE_SCHEMA.md section 6.1.
+//
+// Optional fields (completionPercent, startedAt, completedAt,
+// lastPlaybackSpeed) are validated only when present, because the FlutterFlow
+// schema marks nothing required. The exception is completed == true, which
+// requires completionPercent >= 100 and completedAt.
+// ---------------------------------------------------------------------------
+
+describe('progress value validation', () => {
+  const STORY = 'al-ghayma-al-saghira';
+  const pid = () => doc(aliceDb(), progId(ALICE, ALICE_CHILD, STORY));
+  const row = (o) => progressRow(aliceDb(), ALICE, ALICE_CHILD, STORY, o);
+
+  // --- boundary values that must be accepted ---
+  it('accepts lastPageNumber 0 with completionPercent 0 (not started)', async () => {
+    await assertSucceeds(
+      setDoc(pid(), row({ lastPageNumber: 0, pageCount: 12, completionPercent: 0.0 })),
+    );
+  });
+
+  it('accepts pageCount 0 when completionPercent is 0.0', async () => {
+    await assertSucceeds(
+      setDoc(pid(), row({ lastPageNumber: 0, pageCount: 0, completionPercent: 0.0 })),
+    );
+  });
+
+  it('accepts completionPercent exactly 100.0 with completed and completedAt', async () => {
+    await assertSucceeds(
+      setDoc(pid(), row({
+        lastPageNumber: 12,
+        pageCount: 12,
+        completionPercent: 100.0,
+        completed: true,
+        completedAt: new Date(),
+      })),
+    );
+  });
+
+  it('accepts lastPlaybackSpeed at both range ends', async () => {
+    await assertSucceeds(setDoc(pid(), row({ lastPlaybackSpeed: 0.75 })));
+    await assertSucceeds(setDoc(pid(), row({ lastPlaybackSpeed: 1.25 })));
+  });
+
+  it('accepts a row omitting every optional field', async () => {
+    const db = aliceDb();
+    const minimal = progressRow(db, ALICE, ALICE_CHILD, STORY);
+    delete minimal.completionPercent;
+    delete minimal.startedAt;
+    delete minimal.lastPlaybackSpeed;
+    await assertSucceeds(setDoc(doc(db, progId(ALICE, ALICE_CHILD, STORY)), minimal));
+  });
+
+  // --- negative and out-of-range values that must be rejected ---
+  it('rejects a negative lastPageNumber', async () => {
+    await assertFails(setDoc(pid(), row({ lastPageNumber: -1 })));
+  });
+
+  it('rejects a negative pageCount', async () => {
+    await assertFails(setDoc(pid(), row({ pageCount: -5, lastPageNumber: 0 })));
+  });
+
+  it('rejects lastPageNumber greater than pageCount', async () => {
+    await assertFails(setDoc(pid(), row({ lastPageNumber: 20, pageCount: 12 })));
+  });
+
+  it('rejects completionPercent above 100', async () => {
+    await assertFails(setDoc(pid(), row({ completionPercent: 100.1 })));
+  });
+
+  it('rejects a negative completionPercent', async () => {
+    await assertFails(setDoc(pid(), row({ completionPercent: -0.5 })));
+  });
+
+  it('rejects non-zero completionPercent when pageCount is 0', async () => {
+    await assertFails(
+      setDoc(pid(), row({ pageCount: 0, lastPageNumber: 0, completionPercent: 40.0 })),
+    );
+  });
+
+  it('rejects an invalid lastMode', async () => {
+    await assertFails(setDoc(pid(), row({ lastMode: 'sing' })));
+  });
+
+  it('rejects a translated Arabic lastMode value', async () => {
+    await assertFails(setDoc(pid(), row({ lastMode: 'اقرأ بنفسي' })));
+  });
+
+  it('rejects negative completion counters', async () => {
+    await assertFails(setDoc(pid(), row({ readCompletedCount: -1 })));
+    await assertFails(setDoc(pid(), row({ listenCompletedCount: -2 })));
+  });
+
+  it('rejects a non-positive contentVersion', async () => {
+    await assertFails(setDoc(pid(), row({ contentVersion: 0 })));
+  });
+
+  it('rejects lastPlaybackSpeed outside the supported range', async () => {
+    await assertFails(setDoc(pid(), row({ lastPlaybackSpeed: 2.0 })));
+    await assertFails(setDoc(pid(), row({ lastPlaybackSpeed: 0.1 })));
+  });
+
+  // --- completed / completionPercent consistency ---
+  it('rejects completed true when completionPercent is below 100', async () => {
+    await assertFails(
+      setDoc(pid(), row({ completed: true, completionPercent: 40.0, completedAt: new Date() })),
+    );
+  });
+
+  it('rejects completed true without completedAt', async () => {
+    const db = aliceDb();
+    const r = progressRow(db, ALICE, ALICE_CHILD, STORY, {
+      lastPageNumber: 12,
+      pageCount: 12,
+      completionPercent: 100.0,
+      completed: true,
+    });
+    delete r.completedAt;
+    await assertFails(setDoc(doc(db, progId(ALICE, ALICE_CHILD, STORY)), r));
+  });
+
+  it('rejects completed true with completionPercent missing entirely', async () => {
+    const db = aliceDb();
+    const r = progressRow(db, ALICE, ALICE_CHILD, STORY, {
+      completed: true,
+      completedAt: new Date(),
+    });
+    delete r.completionPercent;
+    await assertFails(setDoc(doc(db, progId(ALICE, ALICE_CHILD, STORY)), r));
+  });
+
+  // --- startedAt immutability (uses the seeded row, which has a known value) ---
+  it('rejects changing startedAt on an existing progress row', async () => {
+    const db = aliceDb();
+    await assertFails(
+      setDoc(
+        doc(db, PROG_ID),
+        progressRow(db, ALICE, ALICE_CHILD, FREE_STORY, {
+          startedAt: new Date('2027-01-01T00:00:00Z'),
+        }),
+      ),
+    );
+  });
+
+  it('accepts an update that preserves startedAt', async () => {
+    const db = aliceDb();
+    await assertSucceeds(
+      setDoc(
+        doc(db, PROG_ID),
+        progressRow(db, ALICE, ALICE_CHILD, FREE_STORY, {
+          lastPageNumber: 9,
+          completionPercent: 75.0,
+          startedAt: SEEDED_STARTED_AT,
+        }),
+      ),
     );
   });
 });
