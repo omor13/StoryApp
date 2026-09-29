@@ -37,3 +37,6 @@ serviceAccount*.json
 firestore-debug.log
 firebase-debug.log
 ui-debug.log
+
+# Pre-deployment state captures — local evidence, not repo content
+backend/firebase/backups/
