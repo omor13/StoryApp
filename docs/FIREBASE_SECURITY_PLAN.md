@@ -229,8 +229,14 @@ do work the path used to do for free. For both collections every rule checks:
 3. `childRef == /users/{request.auth.uid}/children/{childId}` **and** that child exists — so a row cannot point at another parent's child.
 4. `storyRef == /stories/{storyId}` — the reference and the id field agree.
 
-`progress` additionally validates value ranges (`1 <= lastPageNumber <= pageCount`,
-non-negative counters, `lastMode in ['read','listen']`).
+`progress` additionally validates the value semantics of
+[`FIREBASE_SCHEMA.md`](FIREBASE_SCHEMA.md) §6.1: `0 <= lastPageNumber <= pageCount`
+(0 means not started), non-negative counters, `contentVersion > 0`,
+`completionPercent` in `0.0 .. 100.0` and 0 when there are no pages,
+`completed` true only at 100% and only with a `completedAt`, `lastPlaybackSpeed`
+in `0.75 .. 1.25`, `lastMode in ['read','listen']`, and `startedAt` write-once.
+Optional fields are validated only when present, because the FlutterFlow schema
+marks nothing required.
 
 **Document identity is deterministic.** Both collections use
 `{ownerUid}_{childId}_{storyId}` as the document ID, and the rules enforce it:
@@ -262,3 +268,26 @@ equality filter is rejected rather than returning another parent's rows.
 | — | ~~Whether to model `favorites` / `progress` in FlutterFlow~~ — **resolved by ADR-01**: flattened to top-level, created in FlutterFlow 2026-09-28. |
 | — | Whether to add a Cloud Function or custom Dart action for transactional favourite/progress upserts, which would restore exact-once identity (§5). |
 | — | Admin claim mechanism: custom claim vs an `admins/{uid}` document. `isAdmin()` above assumes a custom claim. |
+
+---
+
+## 7. Verification status
+
+**Rules:** verified by the emulator suite in
+[`backend/firebase/tests/`](../backend/firebase/tests/) — **70 tests, all
+passing**, last run 2026-09-29 against `firestore.rules` as committed. The suite
+covers deny-by-default, owner-by-field access on the two flattened collections,
+deterministic document IDs, query-shape enforcement, the §6.1 progress
+semantics, premium-page denial and collection-group isolation.
+
+Running it needs **JDK 21 or newer** — `firebase-tools` 15.x refuses to start
+the Firestore emulator on JDK 17. The emulator runs under the offline project id
+`demo-kids-stories-rules`, so no test can reach `kid-story-app-vel697`.
+
+**Indexes:** `firestore.indexes.json` is reviewed but unverified — composite
+indexes cannot be exercised by the rules emulator, and confirming them requires
+a deployment, which has not happened.
+
+**Deployment: none.** No rules, indexes, schema or data have been deployed. Until
+they are, whatever is live in the Firebase console still governs the database.
+

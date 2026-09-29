@@ -113,4 +113,6 @@ readable at all. Writes to `stories`, `categories` and `appConfig` require an
 
 - [`docs/FIREBASE_SCHEMA.md`](../../docs/FIREBASE_SCHEMA.md) — collections, fields, ADR-01, queries, indexes
 - [`docs/FIREBASE_SECURITY_PLAN.md`](../../docs/FIREBASE_SECURITY_PLAN.md) — principles and open decisions
-- [`backend/firebase/tests/`](tests/) — emulator rule tests
+- [`backend/firebase/tests/`](tests/) — emulator rule tests: **70 tests, all
+  passing** as of 2026-09-29. Needs **JDK 21+** (firebase-tools 15.x rejects
+  anything older); see [`tests/README.md`](tests/README.md) to run them.
