@@ -136,19 +136,73 @@ service cloud.firestore {
     // --------------------------------------------------------------- progress
     match /progress/{progressId} {
       // Value checks from FIREBASE_SCHEMA.md section 6.
-      function progressValuesValid(data) {
+      // Value rules from FIREBASE_SCHEMA.md section 6.1.
+      //
+      // The FlutterFlow schema marks no field as required, so the optional
+      // fields (completionPercent, startedAt, completedAt, lastPlaybackSpeed)
+      // are validated ONLY when present. The two exceptions come from the
+      // semantics themselves: when completed is true, completionPercent and
+      // completedAt must both be present.
+
+      // lastPageNumber is 0 before reading starts, >= 1 while reading, and
+      // may not run past pageCount once pageCount is known.
+      function pagingValid(data) {
         return data.lastPageNumber is int
                && data.pageCount is int
-               && data.contentVersion is int
-               && data.readCompletedCount is int
+               && data.lastPageNumber >= 0
+               && data.pageCount >= 0
+               && (data.pageCount == 0 || data.lastPageNumber <= data.pageCount);
+      }
+
+      function countersValid(data) {
+        return data.readCompletedCount is int
                && data.listenCompletedCount is int
-               && data.completed is bool
-               && data.lastPageNumber >= 1
-               && data.pageCount >= 1
-               && data.lastPageNumber <= data.pageCount
                && data.readCompletedCount >= 0
                && data.listenCompletedCount >= 0
+               && data.contentVersion is int
+               && data.contentVersion > 0;
+      }
+
+      // 0.0-100.0 when present; must be 0.0 when there are no pages.
+      function percentValid(data) {
+        return !('completionPercent' in data)
+               || (data.completionPercent is number
+                   && data.completionPercent >= 0.0
+                   && data.completionPercent <= 100.0
+                   && (data.pageCount > 0 || data.completionPercent == 0.0));
+      }
+
+      // completed only at 100%; completedAt required once completed.
+      function completionConsistent(data) {
+        return data.completed is bool
+               && (data.completed == false
+                   || ('completionPercent' in data
+                       && data.completionPercent >= 100.0
+                       && 'completedAt' in data));
+      }
+
+      // Supported speeds are appConfig/public.playback.speeds = 0.75..1.25.
+      function speedValid(data) {
+        return !('lastPlaybackSpeed' in data)
+               || (data.lastPlaybackSpeed is number
+                   && data.lastPlaybackSpeed >= 0.75
+                   && data.lastPlaybackSpeed <= 1.25);
+      }
+
+      function progressValuesValid(data) {
+        return pagingValid(data)
+               && countersValid(data)
+               && percentValid(data)
+               && completionConsistent(data)
+               && speedValid(data)
                && data.lastMode in ['read', 'listen'];
+      }
+
+      // startedAt is write-once: if it already exists it may never change.
+      function startedAtPreserved() {
+        return !('startedAt' in resource.data)
+               || ('startedAt' in request.resource.data
+                   && request.resource.data.startedAt == resource.data.startedAt);
       }
 
       allow read: if isAdmin() || ownsRow(resource.data);
@@ -159,11 +213,13 @@ service cloud.firestore {
                         && refsAreConsistent(request.resource.data)
                         && progressValuesValid(request.resource.data));
 
-      // Identity fields are pinned; the ordinary progress fields may change.
+      // Identity fields are pinned and startedAt is write-once; the ordinary
+      // progress fields may change freely within their value rules.
       allow update: if isAdmin()
                     || (ownsRow(resource.data)
                         && ownsRow(request.resource.data)
                         && identityUnchanged()
+                        && startedAtPreserved()
                         && idMatchesTuple(progressId, request.resource.data)
                         && refsAreConsistent(request.resource.data)
                         && progressValuesValid(request.resource.data));
