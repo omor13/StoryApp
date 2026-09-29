@@ -3,6 +3,8 @@
 library;
 
 import 'package:flutterflow_ai/flutterflow_ai.dart' as ffai;
+import 'pages/app_bootstrap_page.dart' show appBootstrapPageHandle;
+import 'pages/auth_entry_page.dart' show authEntryPageHandle;
 import 'pages/favorites_page.dart' show favoritesPageHandle;
 import 'pages/home_page.dart' show homePageHandle;
 import 'pages/story_reader_page.dart' show storyReaderPageHandle;
@@ -14,6 +16,8 @@ import 'pages/subscription1year.dart' show subscription1yearHandle;
 import 'pages/subscription3months.dart' show subscription3monthsHandle;
 
 abstract final class Pages {
+  static final appBootstrapPage = appBootstrapPageHandle;
+  static final authEntryPage = authEntryPageHandle;
   static final favoritesPage = favoritesPageHandle;
   static final homePage = homePageHandle;
   static final storyReaderPage = storyReaderPageHandle;
@@ -24,6 +28,8 @@ abstract final class Pages {
   static final subscription1year = subscription1yearHandle;
   static final subscription3months = subscription3monthsHandle;
   static final all = <ffai.ProjectPageHandle>[
+    appBootstrapPage,
+    authEntryPage,
     favoritesPage,
     homePage,
     storyReaderPage,

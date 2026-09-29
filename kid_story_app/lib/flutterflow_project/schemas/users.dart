@@ -46,6 +46,20 @@ final class UsersFields extends MapBase<String, ffai.DslType> {
     type: ffai.string,
     description: "",
   );
+  late final phoneNumber = ffai.ProjectCollectionFieldHandle(
+    name: "phone_number",
+    key: "phone_number",
+    typeName: "String",
+    type: ffai.string,
+    description: "",
+  );
+  late final photoUrl = ffai.ProjectCollectionFieldHandle(
+    name: "photo_url",
+    key: "photo_url",
+    typeName: "ImagePath",
+    type: ffai.imagePath,
+    description: "",
+  );
   late final settings = ffai.ProjectCollectionFieldHandle(
     name: "settings",
     key: "settings",
@@ -76,6 +90,8 @@ final class UsersFields extends MapBase<String, ffai.DslType> {
     "display_name",
     "email",
     "locale",
+    "phone_number",
+    "photo_url",
     "settings",
     "uid",
     "updatedAt",
@@ -89,6 +105,8 @@ final class UsersFields extends MapBase<String, ffai.DslType> {
     "display_name" => this.displayName,
     "email" => this.email,
     "locale" => this.locale,
+    "phone_number" => this.phoneNumber,
+    "photo_url" => this.photoUrl,
     "settings" => this.settings,
     "uid" => this.uid,
     "updatedAt" => this.updatedAt,

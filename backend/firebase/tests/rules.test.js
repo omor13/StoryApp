@@ -850,3 +850,110 @@ describe('admin custom claim', () => {
     await assertFails(writeCategory(truthyString()));
   });
 });
+
+// ---------------------------------------------------------------------------
+// FlutterFlow "Create User Document" compatibility.
+//
+// With autoCreateUserDocument: true and userCollectionName: 'users',
+// FlutterFlow writes users/{currentUserUid} on first sign-in through the
+// generated createUsersRecordData(), which emits ONLY fields present in the
+// users schema and drops nulls (`.withoutNulls`). An anonymous user has no
+// email, display name, photo or phone, so the payload reduces to uid +
+// created_time. photo_url and phone_number are not in the schema at all.
+//
+// These tests pin that exact payload against the deployed rule so a future
+// rules edit cannot silently break first-run sign-in.
+// ---------------------------------------------------------------------------
+
+describe('FlutterFlow anonymous user document', () => {
+  const NEW_UID = 'ff_anon_uid';
+  const ffDb = () => testEnv.authenticatedContext(NEW_UID).firestore();
+
+  /** Exactly what createUsersRecordData() emits for an anonymous sign-in. */
+  const anonUserDoc = () => ({
+    uid: NEW_UID,
+    created_time: new Date(),
+  });
+
+  it('accepts the document FlutterFlow generates for an anonymous user', async () => {
+    await assertSucceeds(
+      setDoc(doc(ffDb(), `users/${NEW_UID}`), anonUserDoc()),
+    );
+  });
+
+  it('accepts it again with the optional schema fields FlutterFlow may fill', async () => {
+    // If the account is later linked to email/password, the same helper adds
+    // email and display_name. Neither is privileged.
+    await assertSucceeds(
+      setDoc(doc(ffDb(), `users/${NEW_UID}`), {
+        ...anonUserDoc(),
+        email: 'parent@example.com',
+        display_name: 'والد نور',
+        locale: 'ar',
+        updatedAt: new Date(),
+      }),
+    );
+  });
+
+  it('denies writing the document at another uid path', async () => {
+    await assertFails(
+      setDoc(doc(ffDb(), `users/${ALICE}`), {
+        uid: ALICE,
+        created_time: new Date(),
+      }),
+    );
+  });
+
+  it('denies a user document carrying a privileged key', async () => {
+    // The client must never be able to grant itself entitlement.
+    for (const key of ['premiumActive', 'entitlementId', 'admin', 'role']) {
+      await assertFails(
+        setDoc(doc(ffDb(), `users/${NEW_UID}`), {
+          ...anonUserDoc(),
+          [key]: true,
+        }),
+      );
+    }
+  });
+
+  it('denies an unauthenticated caller creating a user document', async () => {
+    await assertFails(
+      setDoc(doc(anonDb(), `users/${NEW_UID}`), anonUserDoc()),
+    );
+  });
+
+  it('lets the new user create a child under their own uid', async () => {
+    // The onboarding write HomePage performs after sign-in: exactly the six
+    // documented children fields, no gender, no real name.
+    await assertSucceeds(
+      setDoc(doc(ffDb(), `users/${NEW_UID}/children/auto_id_1`), {
+        nickname: 'سلمى',
+        ageGroup: '3-4',
+        avatarId: 'avatar_01',
+        preferredMode: 'read',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+  });
+
+  it('denies creating a child under another parent', async () => {
+    await assertFails(
+      setDoc(doc(ffDb(), `users/${ALICE}/children/sneaky`), {
+        nickname: 'x',
+        ageGroup: '3-4',
+        avatarId: 'avatar_01',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+  });
+
+  it('denies the collection-group children read the DSL query would emit', async () => {
+    // An unparented FirestoreQuery compiles to collectionGroup('children').
+    // This is why AppBootstrapPage needs its Parent Document Reference set by
+    // hand: without it the bootstrap query is denied, by design.
+    const { collectionGroup, getDocs } = await import('firebase/firestore');
+    await assertFails(getDocs(collectionGroup(ffDb(), 'children')));
+  });
+});

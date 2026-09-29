@@ -19,6 +19,18 @@ final class HomePageParams {
 
 final class HomePageState {
   const HomePageState();
+  ffai.ProjectStateFieldHandle get isCreatingChild =>
+      const ffai.ProjectStateFieldHandle(
+        name: "isCreatingChild",
+        key: "8gdprxkl",
+        typeName: "Boolean",
+      );
+  ffai.ProjectStateFieldHandle get selectedAvatarId =>
+      const ffai.ProjectStateFieldHandle(
+        name: "selectedAvatarId",
+        key: "lwa4y0md",
+        typeName: "String",
+      );
 }
 
 abstract final class HomePageWidgets {
@@ -241,6 +253,9 @@ abstract final class HomePageWidgets {
                                 type: "Container",
                                 path: "HomePage.body[0].children[3].children[0].children[0].children[8].children[0]",
                                 name: "boy",
+                                triggers: const <String>[
+                                  "ON_TAP",
+                                ],
                                 children: <ffai.ProjectWidgetHandle>[
                                   ffai.ProjectWidgetHandle(
                                     key: "Row_6hyqjjbc",
@@ -267,6 +282,9 @@ abstract final class HomePageWidgets {
                                 type: "Container",
                                 path: "HomePage.body[0].children[3].children[0].children[0].children[8].children[1]",
                                 name: "Containergirl",
+                                triggers: const <String>[
+                                  "ON_TAP",
+                                ],
                                 children: <ffai.ProjectWidgetHandle>[
                                   ffai.ProjectWidgetHandle(
                                     key: "Row_to3qbtrk",

@@ -23,10 +23,24 @@ abstract final class AppState {
     typeName: "String",
     persisted: true,
   );
+  static const selectedAvatarId = ffai.ProjectAppStateFieldHandle(
+    name: "selectedAvatarId",
+    key: "n94hdrjz",
+    typeName: "String",
+    persisted: true,
+  );
+  static const selectedChildId = ffai.ProjectAppStateFieldHandle(
+    name: "selectedChildId",
+    key: "w5102y7i",
+    typeName: "String",
+    persisted: true,
+  );
   static const all = <ffai.ProjectAppStateFieldHandle>[
     name,
     age,
     gender,
+    selectedAvatarId,
+    selectedChildId,
   ];
 }
 

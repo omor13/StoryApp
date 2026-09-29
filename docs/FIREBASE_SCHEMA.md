@@ -91,7 +91,26 @@ Consequences, each addressed below:
 
 **Deliberately absent:** any subscription or premium field. Subscription state lives only in `entitlements/{uid}` (server-written) and in RevenueCat. Rules reject unknown keys on this document, so a client cannot add one.
 
-**Do not add:** `photo_url`, `phone_number`, or other FlutterFlow auto-fields that are not needed. Remove them from the FlutterFlow users-collection schema **[VERIFY: FlutterFlow allows removing default auth fields]**.
+**`photo_url` and `phone_number` are required by FlutterFlow [RESOLVED 2026-09-29].** The earlier instruction here was to remove them, pending verification that FlutterFlow allows it. **It does not.** Turning on *Create User Document* makes FlutterFlow validate the user collection and refuse to compile without both:
+
+```
+Collection for user ("users") must contain field "photo_url".
+Collection for user ("users") must contain field "phone_number".
+Your "users" collection's field, photo_url, must be a "ImagePath".
+```
+
+So the collection now also carries:
+
+| Field | Type | Req. | Notes |
+|---|---|---|---|
+| `photo_url` | ImagePath | no | FlutterFlow auth auto-field. **Required to exist; never populated by this app.** |
+| `phone_number` | string | no | FlutterFlow auth auto-field. **Required to exist; never populated by this app.** |
+
+Both stay **null for anonymous users**, and `createUsersRecordData()` drops nulls, so neither is ever written. The alternative — creating `users/{uid}` by hand — is not available: `FirestoreCreate` exposes no document-ID parameter, so the DSL cannot write a document keyed by the uid.
+
+Neither is a privileged key, so the deployed rules are unaffected and **no rules change was needed**. If a permanent login is added later, phone or photo sign-in would start populating them; that is a privacy decision to take at that point, not now.
+
+**Still deliberately absent:** any subscription or premium field, per the paragraph above.
 
 **Document ID:** Firebase Auth UID (also the RevenueCat app user ID).
 
@@ -126,6 +145,39 @@ Consequences, each addressed below:
 **Nothing else is allowed.** Rules must reject unknown fields. Explicitly *not* stored: birth date, real name, gender, photo, school, location, device identifiers.
 
 **Document ID:** Firestore auto-ID (opaque; never derived from the nickname).
+
+### 4.1 The onboarding avatar choice **[AUTHORITATIVE]**
+
+HomePage onboarding shows two cards, **ولد** and **بنت**. They are an **avatar
+picker**, not a gender question, and the choice is persisted **only** through
+`avatarId`:
+
+| Card | `avatarId` written |
+|---|---|
+| ولد | `avatar_01` |
+| بنت | `avatar_02` |
+
+Both values are canonical: they satisfy `^avatar_(0[1-9]|1[0-2])$` and the
+planned `isValidAvatar` validator in
+[`SECURITY_AND_PRIVACY.md`](SECURITY_AND_PRIVACY.md) §121. IDs outside that
+pattern — including `child_boy_01` / `child_girl_01` — must not be written;
+they would pass the rules deployed today (which do not yet validate child
+fields) and then start failing the moment that validator ships.
+
+**No gender field is ever written.** Not `gender`, not `"boy"` / `"girl"`, not
+`"ولد"` / `"بنت"`, not male/female. The decision in the paragraph above stands:
+gender is not stored. `avatarId` records which piece of artwork the child
+picked, nothing more, and two children who pick the same artwork are
+indistinguishable in the data.
+
+`avatarId` is **authoritative per child**. A parent with several children has
+one `avatarId` per child document; nothing about the selection lives outside
+those documents. On bootstrap the visual selection is restored *from* the
+selected child's `avatarId`, never from a remembered UI value.
+
+The runtime list of legal IDs is `appConfig/public.avatarIds` (§14). It is not
+seeded yet, so onboarding uses the two IDs above directly; once seeded, the
+avatar picker should render from it.
 
 **Example**
 ```json

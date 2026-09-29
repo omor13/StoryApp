@@ -3,7 +3,7 @@
 Emulator tests for [`../firestore.rules`](../firestore.rules). **Nothing here
 deploys anything, and nothing here touches a real Firebase project.**
 
-Status: **77 tests, all passing** (last run 2026-09-29).
+Status: **85 tests, all passing** (last run 2026-09-29).
 
 ## Prerequisites
 
