@@ -165,7 +165,7 @@ Every index names the query it serves — none is speculative.
 | I-4 | `stories` | status, publishedAt DESC | Q5 newest |
 | I-7 | `stories` | status, accessLevel, sortOrder | Q14 free / premium shelves |
 | I-5 | `progress` | ownerUid, childId, completed, updatedAt DESC | Q7 continue reading |
-| I-9 | `progress` | ownerUid, childId, storyId | Q11 story detail + upsert probe (§6.1) |
+| I-9 | `progress` | ownerUid, childId, storyId | Q11 story detail + lookup (§6.2) |
 | I-10 | `progress` | ownerUid, childId, completed | Q8 completed badges |
 | I-11 | `favorites` | ownerUid, childId, createdAt DESC | Q9 favourites shelf |
 | I-8 | `favorites` | ownerUid, childId, storyId | Q10 is-favourite + upsert probe (§5.1) |

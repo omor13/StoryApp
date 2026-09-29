@@ -81,7 +81,7 @@ in §13.
 | I-4 | `stories` | status, publishedAt ↓ | Q5 newest stories |
 | I-7 | `stories` | status, accessLevel, sortOrder | Q14 free shelf / premium shelf |
 | I-5 | `progress` | ownerUid, childId, completed, updatedAt ↓ | Q7 continue reading |
-| I-9 | `progress` | ownerUid, childId, storyId | Q11 story detail + progress upsert probe (§6.1) |
+| I-9 | `progress` | ownerUid, childId, storyId | Q11 story detail + progress lookup (§6.2) |
 | I-10 | `progress` | ownerUid, childId, completed | Q8 completed badges |
 | I-11 | `favorites` | ownerUid, childId, createdAt ↓ | Q9 favourites shelf |
 | I-8 | `favorites` | ownerUid, childId, storyId | Q10 is-favourite + favourite upsert probe (§5.1) |

@@ -256,7 +256,37 @@ auto-generated ID cannot land.
 }
 ```
 
-### 6.1 Document identity
+### 6.1 Field semantics **[AUTHORITATIVE]**
+
+These names are authoritative. `currentPage`, `readingMode` and `lastReadAt` do
+**not** exist — `lastPageNumber`, `lastMode` and `updatedAt` carry those
+meanings, and there is exactly one field per concept.
+
+| Field | Meaning and rules |
+|---|---|
+| `lastPageNumber` | The last **successfully opened** story page. `0` before reading starts; page numbers begin at `1` once reading begins. Never negative. |
+| `pageCount` | The number of pages of the **story version being read** (pairs with `contentVersion`). Never negative. |
+| `completionPercent` | `0.0`–`100.0`. **Derived** from `lastPageNumber` and `pageCount`: `100.0 * lastPageNumber / pageCount`. If `pageCount == 0`, it **must** be `0.0`. Always clamp into `0.0`–`100.0`. |
+| `lastMode` | Exactly `"read"` or `"listen"`. **Never store the Arabic labels** (اقرأ بنفسي / استمع إلى القصة) — those are presentation only. |
+| `startedAt` | Set **once**, when the progress document is first created. It must **not** change on any later update. |
+| `updatedAt` | Updated whenever the child reads, listens, turns a page, or playback progress changes. Ordering key for Q7 / index I-5. |
+| `completed` | `true` **only** when `completionPercent` has reached `100.0`. |
+| `completedAt` | Null until the story is completed. Set when `completed` first becomes `true`. **Not reset** by ordinary progress updates. |
+| `contentVersion` | Which version of the story content produced this progress state. Positive integer. Lets the client detect a re-import and clamp `lastPageNumber` safely. |
+| `readCompletedCount` / `listenCompletedCount` | Times the story was finished in each mode. Non-negative integers, starting at `0`. |
+| `lastPlaybackSpeed` | Within the app's supported range, currently **0.75–1.25** (`appConfig/public.playback.speeds` = `[0.75, 1.0, 1.25]`, D-22 still open). Optional. |
+
+**Derivation example.** Page 3 of 12 → `completionPercent = 100.0 * 3 / 12 = 25.0`,
+`completed = false`, `completedAt` absent. Page 12 of 12 → `100.0`,
+`completed = true`, `completedAt` set once.
+
+**Optionality.** The FlutterFlow schema marks no field as required, so a first
+write need not carry the completion fields. `completionPercent`, `startedAt`,
+`completedAt` and `lastPlaybackSpeed` are validated **only when present** — with
+two exceptions that follow from the semantics above: when `completed` is `true`,
+both `completionPercent` (≥ 100.0) and `completedAt` **must** be present.
+
+### 6.2 Document identity
 
 Identical to §5.1: the ID is **`{ownerUid}_{childId}_{storyId}`**, so one
 document per owner, child and story, and a repeated write updates that same
@@ -605,7 +635,7 @@ Flattening removes that scoping, so every `favorites` / `progress` index must
 now lead with `ownerUid, childId`. I-8 to I-11 are new and exist only because
 of the flattening; each one names the query it serves in §13. **I-8 and I-9 are
 lookup indexes only** — they back the Q10/Q11 reads. They do NOT enforce
-uniqueness; the deterministic document ID does (§5.1 / §6.1).
+uniqueness; the deterministic document ID does (§5.1 / §6.2).
 
 **I-12 was removed (2026-09-29).** It proposed a composite index on `events`
 with the single field `eventAt DESC`. Firestore composite indexes require at
