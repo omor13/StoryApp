@@ -32,6 +32,13 @@ final class ProgressFields extends MapBase<String, ffai.DslType> {
     type: ffai.dateTime,
     description: "",
   );
+  late final completionPercent = ffai.ProjectCollectionFieldHandle(
+    name: "completionPercent",
+    key: "completionPercent",
+    typeName: "Double",
+    type: ffai.double_,
+    description: "",
+  );
   late final contentVersion = ffai.ProjectCollectionFieldHandle(
     name: "contentVersion",
     key: "contentVersion",
@@ -88,6 +95,13 @@ final class ProgressFields extends MapBase<String, ffai.DslType> {
     type: ffai.int_,
     description: "",
   );
+  late final startedAt = ffai.ProjectCollectionFieldHandle(
+    name: "startedAt",
+    key: "startedAt",
+    typeName: "DateTime",
+    type: ffai.dateTime,
+    description: "",
+  );
   late final storyId = ffai.ProjectCollectionFieldHandle(
     name: "storyId",
     key: "storyId",
@@ -116,6 +130,7 @@ final class ProgressFields extends MapBase<String, ffai.DslType> {
     "childRef",
     "completed",
     "completedAt",
+    "completionPercent",
     "contentVersion",
     "lastMode",
     "lastPageNumber",
@@ -124,6 +139,7 @@ final class ProgressFields extends MapBase<String, ffai.DslType> {
     "ownerUid",
     "pageCount",
     "readCompletedCount",
+    "startedAt",
     "storyId",
     "storyRef",
     "updatedAt",
@@ -135,6 +151,7 @@ final class ProgressFields extends MapBase<String, ffai.DslType> {
     "childRef" => this.childRef,
     "completed" => this.completed,
     "completedAt" => this.completedAt,
+    "completionPercent" => this.completionPercent,
     "contentVersion" => this.contentVersion,
     "lastMode" => this.lastMode,
     "lastPageNumber" => this.lastPageNumber,
@@ -143,6 +160,7 @@ final class ProgressFields extends MapBase<String, ffai.DslType> {
     "ownerUid" => this.ownerUid,
     "pageCount" => this.pageCount,
     "readCompletedCount" => this.readCompletedCount,
+    "startedAt" => this.startedAt,
     "storyId" => this.storyId,
     "storyRef" => this.storyRef,
     "updatedAt" => this.updatedAt,
