@@ -50,6 +50,12 @@ const DRAFT_STORY = 'not-published-yet';
 
 let testEnv;
 
+/** Deterministic document IDs: {ownerUid}_{childId}_{storyId}. */
+const favId = (uid, childId, storyId) => `favorites/${uid}_${childId}_${storyId}`;
+const progId = (uid, childId, storyId) => `progress/${uid}_${childId}_${storyId}`;
+const FAV_ID = favId(ALICE, ALICE_CHILD, FREE_STORY);
+const PROG_ID = progId(ALICE, ALICE_CHILD, FREE_STORY);
+
 /** A favourite row owned by `uid` for `childId` / `storyId`. */
 function favouriteRow(db, uid, childId, storyId) {
   return {
@@ -155,7 +161,7 @@ before(async () => {
     });
 
     // Pre-existing owned rows, for update/delete tests.
-    await setDoc(doc(db, 'favorites/fav_alice_1'), {
+    await setDoc(doc(db, `favorites/${ALICE}_${ALICE_CHILD}_${FREE_STORY}`), {
       ownerUid: ALICE,
       childId: ALICE_CHILD,
       childRef: doc(db, `users/${ALICE}/children/${ALICE_CHILD}`),
@@ -163,7 +169,7 @@ before(async () => {
       storyRef: doc(db, `stories/${FREE_STORY}`),
       createdAt: new Date(),
     });
-    await setDoc(doc(db, 'progress/prog_alice_1'), {
+    await setDoc(doc(db, `progress/${ALICE}_${ALICE_CHILD}_${FREE_STORY}`), {
       ownerUid: ALICE,
       childId: ALICE_CHILD,
       childRef: doc(db, `users/${ALICE}/children/${ALICE_CHILD}`),
@@ -205,7 +211,7 @@ describe('unauthenticated access', () => {
   it('denies creating a favourite', async () => {
     const db = anonDb();
     await assertFails(
-      addDoc(collection(db, 'favorites'), favouriteRow(db, ALICE, ALICE_CHILD, FREE_STORY)),
+      setDoc(doc(db, FAV_ID), favouriteRow(db, ALICE, ALICE_CHILD, FREE_STORY)),
     );
   });
 });
@@ -254,20 +260,23 @@ describe('favorites (top-level, ADR-01)', () => {
   it('lets a user create and read their own favourite', async () => {
     const db = aliceDb();
     await assertSucceeds(
-      addDoc(collection(db, 'favorites'), favouriteRow(db, ALICE, ALICE_CHILD, PREMIUM_STORY)),
+      setDoc(
+        doc(db, favId(ALICE, ALICE_CHILD, PREMIUM_STORY)),
+        favouriteRow(db, ALICE, ALICE_CHILD, PREMIUM_STORY),
+      ),
     );
-    await assertSucceeds(getDoc(doc(db, 'favorites/fav_alice_1')));
+    await assertSucceeds(getDoc(doc(db, FAV_ID)));
   });
 
   it("denies reading another user's favourite", async () => {
-    await assertFails(getDoc(doc(bobDb(), 'favorites/fav_alice_1')));
+    await assertFails(getDoc(doc(bobDb(), FAV_ID)));
   });
 
   it('denies ownerUid spoofing on create', async () => {
     const db = bobDb();
-    // Bob claims Alice owns the row.
+    // Bob claims Alice owns the row, and uses Alice's tuple ID.
     await assertFails(
-      addDoc(collection(db, 'favorites'), favouriteRow(db, ALICE, ALICE_CHILD, FREE_STORY)),
+      setDoc(doc(db, FAV_ID), favouriteRow(db, ALICE, ALICE_CHILD, FREE_STORY)),
     );
   });
 
@@ -275,19 +284,19 @@ describe('favorites (top-level, ADR-01)', () => {
     const db = aliceDb();
     const row = favouriteRow(db, ALICE, ALICE_CHILD, FREE_STORY);
     row.childRef = doc(db, `users/${BOB}/children/${BOB_CHILD}`);
-    await assertFails(addDoc(collection(db, 'favorites'), row));
+    await assertFails(setDoc(doc(db, FAV_ID), row));
   });
 
   it('denies a mismatched storyId / storyRef', async () => {
     const db = aliceDb();
     const row = favouriteRow(db, ALICE, ALICE_CHILD, FREE_STORY);
     row.storyRef = doc(db, `stories/${PREMIUM_STORY}`);
-    await assertFails(addDoc(collection(db, 'favorites'), row));
+    await assertFails(setDoc(doc(db, FAV_ID), row));
   });
 
   it('denies changing ownerUid on update', async () => {
     await assertFails(
-      updateDoc(doc(aliceDb(), 'favorites/fav_alice_1'), { ownerUid: BOB }),
+      updateDoc(doc(aliceDb(), FAV_ID), { ownerUid: BOB }),
     );
   });
 });
@@ -297,7 +306,7 @@ describe('progress (top-level, ADR-01)', () => {
     const db = aliceDb();
     await assertSucceeds(
       setDoc(
-        doc(db, 'progress/prog_alice_1'),
+        doc(db, PROG_ID),
         progressRow(db, ALICE, ALICE_CHILD, FREE_STORY, { lastPageNumber: 5 }),
       ),
     );
@@ -306,16 +315,16 @@ describe('progress (top-level, ADR-01)', () => {
   it("denies updating another user's progress", async () => {
     const db = bobDb();
     await assertFails(
-      updateDoc(doc(db, 'progress/prog_alice_1'), { lastPageNumber: 9 }),
+      updateDoc(doc(db, PROG_ID), { lastPageNumber: 9 }),
     );
   });
 
   it('denies lastPageNumber greater than pageCount', async () => {
     const db = aliceDb();
     await assertFails(
-      addDoc(
-        collection(db, 'progress'),
-        progressRow(db, ALICE, ALICE_CHILD, FREE_STORY, {
+      setDoc(
+        doc(db, progId(ALICE, ALICE_CHILD, PREMIUM_STORY)),
+        progressRow(db, ALICE, ALICE_CHILD, PREMIUM_STORY, {
           lastPageNumber: 99,
           pageCount: 12,
         }),
@@ -326,9 +335,9 @@ describe('progress (top-level, ADR-01)', () => {
   it('denies an invalid lastMode', async () => {
     const db = aliceDb();
     await assertFails(
-      addDoc(
-        collection(db, 'progress'),
-        progressRow(db, ALICE, ALICE_CHILD, FREE_STORY, { lastMode: 'sing' }),
+      setDoc(
+        doc(db, progId(ALICE, ALICE_CHILD, PREMIUM_STORY)),
+        progressRow(db, ALICE, ALICE_CHILD, PREMIUM_STORY, { lastMode: 'sing' }),
       ),
     );
   });
@@ -427,5 +436,153 @@ describe('collection-group isolation', () => {
   it('denies an ordinary user a collection-group read of children', async () => {
     const { collectionGroup, getDocs } = await import('firebase/firestore');
     await assertFails(getDocs(collectionGroup(aliceDb(), 'children')));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Deterministic document IDs — {ownerUid}_{childId}_{storyId}
+//
+// The ID is configured with the Custom ID toggle on the Create Document action
+// in the FlutterFlow editor. These tests pin the rule that enforces it, so an
+// auto-ID write (or a forged tuple) cannot land.
+// ---------------------------------------------------------------------------
+
+describe('deterministic document IDs', () => {
+  const OTHER_STORY = 'al-ghayma-al-saghira';
+
+  it('1. accepts a favourite whose ID matches the tuple', async () => {
+    const db = aliceDb();
+    await assertSucceeds(
+      setDoc(
+        doc(db, favId(ALICE, ALICE_CHILD, OTHER_STORY)),
+        favouriteRow(db, ALICE, ALICE_CHILD, OTHER_STORY),
+      ),
+    );
+  });
+
+  it('2. rejects a favourite whose ID does not match the tuple', async () => {
+    const db = aliceDb();
+    await assertFails(
+      setDoc(
+        doc(db, 'favorites/some-auto-generated-id'),
+        favouriteRow(db, ALICE, ALICE_CHILD, OTHER_STORY),
+      ),
+    );
+  });
+
+  it('3. accepts progress whose ID matches the tuple', async () => {
+    const db = aliceDb();
+    await assertSucceeds(
+      setDoc(
+        doc(db, progId(ALICE, ALICE_CHILD, OTHER_STORY)),
+        progressRow(db, ALICE, ALICE_CHILD, OTHER_STORY),
+      ),
+    );
+  });
+
+  it('4. rejects progress whose ID does not match the tuple', async () => {
+    const db = aliceDb();
+    await assertFails(
+      setDoc(
+        doc(db, 'progress/auto-id-9f2b'),
+        progressRow(db, ALICE, ALICE_CHILD, OTHER_STORY),
+      ),
+    );
+  });
+
+  it('5. rejects an ID whose ownerUid is not the authenticated uid', async () => {
+    // Bob is signed in, but builds the ID (and the row) around Alice's uid.
+    const db = bobDb();
+    await assertFails(
+      setDoc(
+        doc(db, favId(ALICE, ALICE_CHILD, FREE_STORY)),
+        favouriteRow(db, ALICE, ALICE_CHILD, FREE_STORY),
+      ),
+    );
+  });
+
+  it('6. rejects an ID whose childId differs from the document field', async () => {
+    const db = aliceDb();
+    const row = favouriteRow(db, ALICE, ALICE_CHILD, FREE_STORY);
+    // ID says a different child than the row does.
+    await assertFails(
+      setDoc(doc(db, `favorites/${ALICE}_other_child_${FREE_STORY}`), row),
+    );
+  });
+
+  it('7. rejects an ID whose storyId differs from the document field', async () => {
+    const db = aliceDb();
+    const row = favouriteRow(db, ALICE, ALICE_CHILD, FREE_STORY);
+    await assertFails(
+      setDoc(doc(db, `favorites/${ALICE}_${ALICE_CHILD}_some-other-story`), row),
+    );
+  });
+
+  it('8. rejects updating identity fields on an existing progress row', async () => {
+    // storyId is part of the identity tuple and the document ID, so changing
+    // it would desync the row from its key.
+    await assertFails(
+      updateDoc(doc(aliceDb(), PROG_ID), { storyId: OTHER_STORY }),
+    );
+  });
+
+  it('9. accepts updating ordinary progress fields when identity is unchanged', async () => {
+    const db = aliceDb();
+    await assertSucceeds(
+      setDoc(
+        doc(db, PROG_ID),
+        progressRow(db, ALICE, ALICE_CHILD, FREE_STORY, {
+          lastPageNumber: 7,
+          completed: true,
+          completionPercent: 58.3,
+          readCompletedCount: 1,
+        }),
+      ),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Collection queries.
+//
+// Firestore rules are not filters: an unfiltered query is rejected outright
+// rather than silently returning the caller's own subset. Both the document
+// path and the query shape therefore need their own tests.
+// ---------------------------------------------------------------------------
+
+describe('collection queries', () => {
+  it('10. allows a favourites query restricted to the authenticated owner', async () => {
+    const { query, where, getDocs } = await import('firebase/firestore');
+    const db = aliceDb();
+    await assertSucceeds(
+      getDocs(
+        query(collection(db, 'favorites'), where('ownerUid', '==', ALICE)),
+      ),
+    );
+  });
+
+  it('11. denies an unfiltered favourites collection query', async () => {
+    const { getDocs } = await import('firebase/firestore');
+    await assertFails(getDocs(collection(aliceDb(), 'favorites')));
+  });
+
+  it('12. denies an unfiltered progress collection query', async () => {
+    const { getDocs } = await import('firebase/firestore');
+    await assertFails(getDocs(collection(aliceDb(), 'progress')));
+  });
+
+  it('denies a favourites query filtered to ANOTHER user', async () => {
+    const { query, where, getDocs } = await import('firebase/firestore');
+    await assertFails(
+      getDocs(query(collection(bobDb(), 'favorites'), where('ownerUid', '==', ALICE))),
+    );
+  });
+
+  it('allows a progress query restricted to the authenticated owner', async () => {
+    const { query, where, getDocs } = await import('firebase/firestore');
+    const db = aliceDb();
+    await assertSucceeds(
+      getDocs(query(collection(db, 'progress'), where('ownerUid', '==', ALICE))),
+    );
   });
 });
