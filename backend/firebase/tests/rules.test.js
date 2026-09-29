@@ -772,3 +772,81 @@ describe('progress value validation', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Admin custom claim.
+//
+// isAdmin() reads the claim through Map.get with a `false` default. A direct
+// request.auth.token.admin access resolves the same way, but makes the operand
+// an error for every ordinary user and floods the audit log with
+// "Property admin is undefined on object". These tests pin the behaviour for
+// all three claim states: absent, false, and true.
+// ---------------------------------------------------------------------------
+
+describe('admin custom claim', () => {
+  // A signed-in user whose token carries `admin: false` explicitly.
+  const adminFalseDb = () =>
+    testEnv.authenticatedContext('claims_false_uid', { admin: false }).firestore();
+
+  // Two operations only an admin may perform: reading the non-public config
+  // document, and writing catalogue content.
+  const readSecretConfig = (db) => getDoc(doc(db, 'appConfig/secret'));
+  const writeCategory = (db) =>
+    setDoc(doc(db, 'categories/claim-probe'), {
+      nameAr: 'اختبار',
+      iconId: 'cat_test',
+      sortOrder: 99,
+      isActive: true,
+    });
+
+  it('1. treats an authenticated user with no admin claim as not admin', async () => {
+    await assertFails(readSecretConfig(aliceDb()));
+    await assertFails(writeCategory(aliceDb()));
+  });
+
+  it('2. treats admin=false as not admin', async () => {
+    await assertFails(readSecretConfig(adminFalseDb()));
+    await assertFails(writeCategory(adminFalseDb()));
+  });
+
+  it('3. treats admin=true as admin', async () => {
+    await assertSucceeds(readSecretConfig(adminDb()));
+    await assertSucceeds(writeCategory(adminDb()));
+  });
+
+  it('4. still lets an owner without an admin claim do owner operations', async () => {
+    const db = aliceDb();
+    // Read own user document, read own entitlement, read a published story,
+    // and write an owned favourite — none of which needs a claim.
+    await assertSucceeds(getDoc(doc(db, `users/${ALICE}`)));
+    await assertSucceeds(getDoc(doc(db, `entitlements/${ALICE}`)));
+    await assertSucceeds(getDoc(doc(db, `stories/${FREE_STORY}`)));
+    await assertSucceeds(
+      setDoc(doc(db, FAV_ID), favouriteRow(db, ALICE, ALICE_CHILD, FREE_STORY)),
+    );
+  });
+
+  it('5. denies a non-owner with no admin claim', async () => {
+    const db = bobDb();
+    await assertFails(getDoc(doc(db, `users/${ALICE}`)));
+    await assertFails(getDoc(doc(db, `users/${ALICE}/children/${ALICE_CHILD}`)));
+    await assertFails(getDoc(doc(db, `entitlements/${ALICE}`)));
+    await assertFails(getDoc(doc(db, FAV_ID)));
+  });
+
+  it('6. still denies an unauthenticated caller everywhere', async () => {
+    const db = anonDb();
+    await assertFails(readSecretConfig(db));
+    await assertFails(writeCategory(db));
+    await assertFails(getDoc(doc(db, 'appConfig/public')));
+    await assertFails(getDoc(doc(db, 'categories/nature')));
+    await assertFails(getDoc(doc(db, `stories/${FREE_STORY}`)));
+  });
+
+  it('does not grant admin via a forged non-boolean claim value', async () => {
+    const truthyString = () =>
+      testEnv.authenticatedContext('claims_string_uid', { admin: 'true' }).firestore();
+    await assertFails(readSecretConfig(truthyString()));
+    await assertFails(writeCategory(truthyString()));
+  });
+});

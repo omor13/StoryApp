@@ -30,8 +30,15 @@ service cloud.firestore {
 
     // Admin is a Firebase Auth custom claim. No client is issued one; content
     // and entitlement writes happen through the Admin SDK.
+    //
+    // Read through Map.get with a default rather than request.auth.token.admin:
+    // the claim is absent for every ordinary user, and a direct access on a
+    // missing key makes the operand an error. The rule still resolves correctly
+    // (an erroring operand of || lets the other branch decide), but it emits a
+    // "Property admin is undefined on object" warning on essentially every
+    // request, which buries real rule errors in the production audit log.
     function isAdmin() {
-      return signedIn() && request.auth.token.admin == true;
+      return signedIn() && request.auth.token.get('admin', false) == true;
     }
 
     // The child document must exist under the calling user.
@@ -164,29 +171,37 @@ service cloud.firestore {
       }
 
       // 0.0-100.0 when present; must be 0.0 when there are no pages.
+      //
+      // Read through Map.get rather than guarding a direct access with `in`.
+      // Rules evaluate both operands of `||`, so `!('x' in data) || data.x ...`
+      // still evaluates `data.x` on a row that omits it: the result is correct
+      // (true || error == true) but an evaluation error is logged on an ALLOW
+      // path, and the rule only survives because errors absorb that way. The
+      // default is the value an absent field is defined to mean.
       function percentValid(data) {
-        return !('completionPercent' in data)
-               || (data.completionPercent is number
-                   && data.completionPercent >= 0.0
-                   && data.completionPercent <= 100.0
-                   && (data.pageCount > 0 || data.completionPercent == 0.0));
+        return data.get('completionPercent', 0.0) is number
+               && data.get('completionPercent', 0.0) >= 0.0
+               && data.get('completionPercent', 0.0) <= 100.0
+               && (data.pageCount > 0
+                   || data.get('completionPercent', 0.0) == 0.0);
       }
 
       // completed only at 100%; completedAt required once completed.
+      // An absent completionPercent defaults to 0.0, which fails the >= 100
+      // test, so `completed: true` without a percent is still rejected.
       function completionConsistent(data) {
         return data.completed is bool
                && (data.completed == false
-                   || ('completionPercent' in data
-                       && data.completionPercent >= 100.0
+                   || (data.get('completionPercent', 0.0) >= 100.0
                        && 'completedAt' in data));
       }
 
       // Supported speeds are appConfig/public.playback.speeds = 0.75..1.25.
+      // Absent means the default speed, so the fallback is 1.0.
       function speedValid(data) {
-        return !('lastPlaybackSpeed' in data)
-               || (data.lastPlaybackSpeed is number
-                   && data.lastPlaybackSpeed >= 0.75
-                   && data.lastPlaybackSpeed <= 1.25);
+        return data.get('lastPlaybackSpeed', 1.0) is number
+               && data.get('lastPlaybackSpeed', 1.0) >= 0.75
+               && data.get('lastPlaybackSpeed', 1.0) <= 1.25;
       }
 
       function progressValuesValid(data) {
@@ -199,10 +214,12 @@ service cloud.firestore {
       }
 
       // startedAt is write-once: if it already exists it may never change.
+      // Both sides read through Map.get, so a row that has never carried a
+      // startedAt does not raise an evaluation error on the allow path.
       function startedAtPreserved() {
         return !('startedAt' in resource.data)
-               || ('startedAt' in request.resource.data
-                   && request.resource.data.startedAt == resource.data.startedAt);
+               || request.resource.data.get('startedAt', null)
+                  == resource.data.get('startedAt', null);
       }
 
       allow read: if isAdmin() || ownsRow(resource.data);

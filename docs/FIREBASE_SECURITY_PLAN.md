@@ -274,11 +274,20 @@ equality filter is rejected rather than returning another parent's rows.
 ## 7. Verification status
 
 **Rules:** verified by the emulator suite in
-[`backend/firebase/tests/`](../backend/firebase/tests/) — **70 tests, all
+[`backend/firebase/tests/`](../backend/firebase/tests/) — **77 tests, all
 passing**, last run 2026-09-29 against `firestore.rules` as committed. The suite
 covers deny-by-default, owner-by-field access on the two flattened collections,
 deterministic document IDs, query-shape enforcement, the §6.1 progress
-semantics, premium-page denial and collection-group isolation.
+semantics, premium-page denial, collection-group isolation, and all three states
+of the `admin` custom claim (absent, `false`, `true`).
+
+**Optional fields are read through `Map.get` with a default, never through an
+`in` guard.** Rules evaluate both operands of `||`, so
+`!('x' in data) || data.x >= 0` still evaluates `data.x` on a row that omits
+`x`. The verdict is correct — `true || error` is `true` — but the rule is then
+allowing a write only because an error was absorbed, and every such request
+writes an evaluation error into the audit log. The same reasoning applies to
+`isAdmin()`, which reads `request.auth.token.get('admin', false)`.
 
 Running it needs **JDK 21 or newer** — `firebase-tools` 15.x refuses to start
 the Firestore emulator on JDK 17. The emulator runs under the offline project id

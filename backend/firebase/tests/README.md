@@ -3,7 +3,7 @@
 Emulator tests for [`../firestore.rules`](../firestore.rules). **Nothing here
 deploys anything, and nothing here touches a real Firebase project.**
 
-Status: **70 tests, all passing** (last run 2026-09-29).
+Status: **77 tests, all passing** (last run 2026-09-29).
 
 ## Prerequisites
 
@@ -46,13 +46,28 @@ it never contacts Google, needs no login, and cannot reach the real
 the `PROJECT_ID` constant in `rules.test.js` must stay identical, and must keep
 the `demo-` prefix.
 
-### Expected noise
+### Expected output
 
-The emulator prints `Property admin is undefined on object` on almost every
-write. This is not a failure. `isAdmin()` reads `request.auth.token.admin`,
-which is absent for ordinary users; in Firestore rules an erroring operand of
-`||` still lets the other branch decide, so the rule evaluates correctly and the
-emulator merely warns. Only the mocha pass/fail counts matter.
+A clean run prints **no** `Property admin is undefined on object` warnings. That
+message used to appear on nearly every write, because `isAdmin()` read
+`request.auth.token.admin` directly and the claim is absent for ordinary users.
+It now reads `request.auth.token.get('admin', false)`, so the operand no longer
+errors.
+
+A handful of `evaluation error` lines remain, and all of them belong to requests
+that were **denied anyway** — an unauthenticated caller makes
+`request.auth.uid` an error, which is exactly the case the rule rejects. Each
+one is paired with a `false for ...` verdict in the same message. An evaluation
+error that is *not* paired with a denial would be a genuine problem: it would
+mean a rule is allowing a write only because an error was absorbed by `||`.
+
+Mocha cannot see the emulator log, so that check is manual. After a run:
+
+```bash
+npm test > run.txt 2>&1
+grep -c 'Property admin is undefined' run.txt          # expect 0
+grep 'evaluation error' run.txt | grep -vc 'false for' # expect 0
+```
 
 ## What is covered
 
