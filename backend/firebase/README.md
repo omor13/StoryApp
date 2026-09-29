@@ -62,12 +62,14 @@ firebase deploy --only firestore:rules --project <your-project-id> --dry-run
 | File | Purpose |
 |---|---|
 | `firestore.rules` | Deny-by-default security rules. Authoritative. |
-| `firestore.indexes.json` | The 12 composite indexes below. |
+| `firestore.indexes.json` | The 11 composite indexes below. |
 | `firebase.json` | Points **only** at the two files above, by relative path. |
 
 ## Index map
 
-Each index names the query it serves; none is speculative. IDs match
+Each index names the query it serves; none is speculative. **I-8 and I-9 are
+lookup indexes for Q10/Q11 — they do not enforce uniqueness; the deterministic
+document ID does.** IDs match
 [`docs/FIREBASE_SCHEMA.md`](../../docs/FIREBASE_SCHEMA.md) §14 and the queries
 in §13.
 
@@ -84,7 +86,6 @@ in §13.
 | I-11 | `favorites` | ownerUid, childId, createdAt ↓ | Q9 favourites shelf |
 | I-8 | `favorites` | ownerUid, childId, storyId | Q10 is-favourite + favourite upsert probe (§5.1) |
 | I-6 | `categories` | isActive, sortOrder | Q13 active categories |
-| I-12 | `events` | eventAt ↓ | Admin/audit read of entitlement events. Server-side only. |
 
 **Why the `favorites` / `progress` indexes lead with `ownerUid`:** ADR-01
 flattened both to top-level because FlutterFlow supports only one subcollection
