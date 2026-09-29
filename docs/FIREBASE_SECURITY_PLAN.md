@@ -20,7 +20,7 @@
 
 FlutterFlow's own rules deployment stays **off** — rules are owned by the repository, not the builder.
 
-> **Do not leave Firestore in test mode.** Test mode grants blanket read/write to any authenticated (or even unauthenticated) caller and expires silently. Until the rules below are deployed, treat the database as unprotected and keep no real user data in it.
+> **Resolved 2026-09-29: Firestore is no longer in test mode** — the rules below are deployed and govern the database. The original warning, kept for context: test mode grants blanket read/write to any authenticated (or even unauthenticated) caller and expires silently.
 
 ---
 
@@ -293,10 +293,16 @@ Running it needs **JDK 21 or newer** — `firebase-tools` 15.x refuses to start
 the Firestore emulator on JDK 17. The emulator runs under the offline project id
 `demo-kids-stories-rules`, so no test can reach `kid-story-app-vel697`.
 
-**Indexes:** `firestore.indexes.json` is reviewed but unverified — composite
-indexes cannot be exercised by the rules emulator, and confirming them requires
-a deployment, which has not happened.
+**Indexes:** all 11 composite indexes are deployed and READY in production,
+matching `firestore.indexes.json` field-for-field. They still carry no
+*query-level* verification: composite indexes cannot be exercised by the rules
+emulator, and no query has yet run against them. Firestore appends an implicit
+`__name__` tiebreaker to every composite index; that is automatic and is not
+written in the file.
 
-**Deployment: none.** No rules, indexes, schema or data have been deployed. Until
-they are, whatever is live in the Firebase console still governs the database.
+**Deployment: live.** Rules and indexes were deployed to `kid-story-app-vel697`
+(`(default)` database, `eur3`) at 2026-09-29T09:55Z from commit `e09e52f`. The
+rules release succeeded and all 11 composite indexes are READY. The database is
+no longer in test mode. No data, Auth, Storage, Functions or billing change was
+made. See [`backend/firebase/DEPLOYMENT_LOG.md`](../backend/firebase/DEPLOYMENT_LOG.md).
 

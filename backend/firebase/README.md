@@ -31,31 +31,55 @@ Three things follow:
    the two repo-owned files beside it — never from the export directory and
    never from the repository root.
 
-## 🚩 Deployment status: NONE
+## Deployment status: LIVE
 
-**No Firebase deployment has been performed.** No rules, no indexes, no schema,
-no data. Everything here is reviewed-but-undeployed. Until it is deployed,
-whatever is live in the Firebase console still governs the database — if that is
-still test mode, treat the database as unprotected and keep real user data out
-of it.
+**Deployed 2026-09-29T09:55Z to `kid-story-app-vel697`**, `(default)` database
+in `eur3`, from commit `e09e52f`. Rules released; all 11 composite indexes
+READY. Full record in [`DEPLOYMENT_LOG.md`](DEPLOYMENT_LOG.md).
 
-## Deploying (when authorised)
+The database is no longer in test mode: it is governed by the rules in this
+directory. Rules and indexes only — no data, Auth, Storage, Functions or billing
+change was made.
 
-Run from this directory. Requires the Firebase CLI and a selected project.
+**The repository is the source of truth.** If these files and the console
+disagree, the console was edited by hand; re-deploy from here rather than
+patching in the console.
+
+## Deploying
+
+Run from this directory. Requires the Firebase CLI, JDK 21+ for the test suite,
+and an authenticated account with access to the project.
 
 ```
 cd backend/firebase
-firebase deploy --only firestore:rules,firestore:indexes --project <your-project-id>
+firebase deploy --only firestore --project kid-story-app-vel697
 ```
 
 Rules and indexes only. Nothing here needs Blaze billing; there are no Cloud
 Functions in this task.
 
-Dry-run the rules first if you want a syntax check without deploying:
+Before deploying:
 
-```
-firebase deploy --only firestore:rules --project <your-project-id> --dry-run
-```
+1. **Run the tests.** `cd tests && npm test` — see [`tests/README.md`](tests/README.md).
+   Do not deploy on a red suite.
+2. **Dry-run**, which compiles the rules and resolves the paths without
+   releasing anything:
+   ```
+   firebase deploy --only firestore --project kid-story-app-vel697 --dry-run
+   ```
+3. **Capture the current index list**, so a regression is detectable:
+   ```
+   firebase firestore:indexes --project kid-story-app-vel697 --database "(default)" \
+     > backups/predeploy-$(date -u +%Y%m%dT%H%M%SZ)/indexes-before.json
+   ```
+
+Use `--only firestore`, never `--force`, and always pass `--project`
+explicitly — there is deliberately no `.firebaserc`, so nothing depends on a
+global active project. If the CLI ever offers to **delete** an index that is
+absent from `firestore.indexes.json`, answer no and find out where it came from
+first; composite indexes are additive and deleting one can break a live query.
+
+Append a new entry to [`DEPLOYMENT_LOG.md`](DEPLOYMENT_LOG.md) afterwards.
 
 ## Files
 
